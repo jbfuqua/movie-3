@@ -619,6 +619,89 @@
                 return lines;
             }
 
+            getEraSpecificStyling(decade, genre) {
+                const isSciFi = (genre || '').toLowerCase().includes('sci-fi');
+                const isHorror = (genre || '').toLowerCase().includes('horror');
+                
+                const stylings = {
+                    '1950s': {
+                        titleFont: 'Cinzel',
+                        taglineFont: 'Lato',
+                        creditsFont: 'Lato',
+                        titleColor: '#ffffff',
+                        titleGlow: 'rgba(255, 215, 0, 0.8)', // Gold glow
+                        taglineColor: 'rgba(255, 255, 255, 0.9)',
+                        creditsColor: 'rgba(255, 255, 255, 0.85)'
+                    },
+                    '1960s': {
+                        titleFont: isSciFi ? 'Orbitron' : 'Bebas Neue',
+                        taglineFont: 'Lato',
+                        creditsFont: 'Lato', 
+                        titleColor: isSciFi ? '#00ffff' : '#ffffff',
+                        titleGlow: isSciFi ? 'rgba(0, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.8)',
+                        taglineColor: 'rgba(255, 255, 255, 0.9)',
+                        creditsColor: 'rgba(255, 255, 255, 0.85)'
+                    },
+                    '1970s': {
+                        titleFont: 'Bebas Neue',
+                        taglineFont: 'Lato',
+                        creditsFont: 'Lato',
+                        titleColor: isHorror ? '#ff6b6b' : '#ffd700',
+                        titleGlow: isHorror ? 'rgba(255, 107, 107, 0.9)' : 'rgba(255, 215, 0, 0.8)',
+                        taglineColor: 'rgba(255, 255, 255, 0.9)',
+                        creditsColor: 'rgba(255, 255, 255, 0.85)'
+                    },
+                    '1980s': {
+                        titleFont: 'Orbitron',
+                        taglineFont: 'Orbitron',
+                        creditsFont: 'Lato',
+                        titleColor: isSciFi ? '#00ffff' : (isHorror ? '#ff1493' : '#ff6b35'),
+                        titleGlow: isSciFi ? 'rgba(0, 255, 255, 1.0)' : (isHorror ? 'rgba(255, 20, 147, 0.9)' : 'rgba(255, 107, 53, 0.9)'),
+                        taglineColor: isSciFi ? 'rgba(0, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                        creditsColor: 'rgba(255, 255, 255, 0.85)'
+                    },
+                    '1990s': {
+                        titleFont: 'Montserrat',
+                        taglineFont: 'Lato',
+                        creditsFont: 'Lato',
+                        titleColor: '#ffffff',
+                        titleGlow: 'rgba(128, 128, 128, 0.7)', // Silver glow
+                        taglineColor: 'rgba(255, 255, 255, 0.9)',
+                        creditsColor: 'rgba(255, 255, 255, 0.85)'
+                    },
+                    '2000s': {
+                        titleFont: 'Oswald',
+                        taglineFont: 'Lato',
+                        creditsFont: 'Lato',
+                        titleColor: isSciFi ? '#00ff41' : '#ffffff', // Matrix green for sci-fi
+                        titleGlow: isSciFi ? 'rgba(0, 255, 65, 0.8)' : 'rgba(255, 255, 255, 0.7)',
+                        taglineColor: 'rgba(255, 255, 255, 0.9)',
+                        creditsColor: 'rgba(255, 255, 255, 0.85)'
+                    },
+                    '2010s': {
+                        titleFont: 'Poppins',
+                        taglineFont: 'Poppins',
+                        creditsFont: 'Lato',
+                        titleColor: '#ffffff',
+                        titleGlow: 'rgba(59, 130, 246, 0.8)', // Blue glow
+                        taglineColor: 'rgba(255, 255, 255, 0.9)',
+                        creditsColor: 'rgba(255, 255, 255, 0.85)'
+                    },
+                    '2020s': {
+                        titleFont: 'Montserrat',
+                        taglineFont: 'Poppins',
+                        creditsFont: 'Lato',
+                        titleColor: '#ffffff',
+                        titleGlow: 'rgba(0, 0, 0, 0.9)', // Subtle shadow only
+                        taglineColor: 'rgba(255, 255, 255, 0.95)',
+                        creditsColor: 'rgba(255, 255, 255, 0.9)'
+                    }
+                };
+                
+                // Default fallback
+                return stylings[decade] || stylings['1980s'];
+            }
+
             renderTitleAndCredits(concept) {
                 const canvas = this.elements.canvas;
                 const ctx = this.ctx;
@@ -628,28 +711,43 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                // FIXED: Safe margins for text rendering
-                const safeMargin = w * 0.06; // 6% margin on each side
+                // Get era-specific styling
+                const styling = this.getEraSpecificStyling(concept.decade, concept.genre);
+
+                // Safe margins for text rendering
+                const safeMargin = w * 0.06;
                 const maxTextWidth = w - (safeMargin * 2);
 
-                // TITLE RENDERING WITH PROPER BOUNDS
+                // TITLE RENDERING WITH ERA-SPECIFIC STYLING
                 const title = (concept.title || '').toUpperCase();
                 if (title) {
                     let fontSize = Math.min(120, w / 8);
-                    ctx.font = 'bold ' + fontSize + 'px Bebas Neue';
+                    ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     
-                    // FIXED: Reduce font size until it fits within safe bounds
+                    // Reduce font size until it fits within safe bounds
                     while (ctx.measureText(title).width > maxTextWidth && fontSize > 20) {
                         fontSize -= 2;
-                        ctx.font = 'bold ' + fontSize + 'px Bebas Neue';
+                        ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     }
 
-                    // FIXED: If still too long, wrap the title
+                    // Wrap title if needed
                     const titleLines = this.wrapText(ctx, title, w / 2, h * 0.15, maxTextWidth, fontSize * 1.1);
                     
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-                    ctx.shadowBlur = Math.max(fontSize / 6, 10);
-                    ctx.fillStyle = '#ffffff';
+                    // Era-specific glow effect
+                    ctx.shadowColor = styling.titleGlow;
+                    ctx.shadowBlur = Math.max(fontSize / 4, 15);
+                    
+                    // Add outer glow for sci-fi/80s
+                    if (concept.decade === '1980s' || (concept.genre || '').toLowerCase().includes('sci-fi')) {
+                        ctx.strokeStyle = styling.titleGlow;
+                        ctx.lineWidth = 3;
+                        titleLines.forEach((line, index) => {
+                            const yOffset = (index - (titleLines.length - 1) / 2) * fontSize * 1.1;
+                            ctx.strokeText(line, w / 2, h * 0.15 + yOffset);
+                        });
+                    }
+                    
+                    ctx.fillStyle = styling.titleColor;
                     
                     // Render each line of the title
                     titleLines.forEach((line, index) => {
@@ -659,24 +757,27 @@
                     ctx.shadowBlur = 0;
                 }
 
-                // TAGLINE RENDERING WITH PROPER BOUNDS
+                // TAGLINE RENDERING WITH ERA-SPECIFIC STYLING
                 if (concept.tagline) {
                     const tagline = concept.tagline;
                     let fontSize = Math.max(16, Math.floor(w / 35));
-                    ctx.font = 'italic ' + fontSize + 'px Lato';
+                    ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     
-                    // FIXED: Reduce font size if tagline is too wide
+                    // Reduce font size if tagline is too wide
                     while (ctx.measureText(tagline).width > maxTextWidth && fontSize > 12) {
                         fontSize -= 1;
-                        ctx.font = 'italic ' + fontSize + 'px Lato';
+                        ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     }
                     
-                    // FIXED: If still too long, wrap the tagline
+                    // Wrap tagline if needed
                     const taglineLines = this.wrapText(ctx, tagline, w / 2, h * 0.24, maxTextWidth, fontSize * 1.3);
                     
+                    // Subtle shadow for tagline
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+                    ctx.shadowBlur = fontSize / 3;
                     ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-                    ctx.lineWidth = 3;
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = styling.taglineColor;
                     
                     taglineLines.forEach((line, index) => {
                         const yOffset = (index - (taglineLines.length - 1) / 2) * fontSize * 1.3;
@@ -684,47 +785,84 @@
                         ctx.strokeText(line, w / 2, yPos);
                         ctx.fillText(line, w / 2, yPos);
                     });
+                    ctx.shadowBlur = 0;
                 }
 
-                // CREDITS RENDERING WITH PROPER BOUNDS
+                // VARIABLE RUNTIME AND CREDITS
+                const runtimes = ['89 MINUTES', '95 MINUTES', '103 MINUTES', '117 MINUTES', '124 MINUTES', '138 MINUTES'];
+                const randomRuntime = runtimes[Math.floor(Math.random() * runtimes.length)];
+                
                 const credits = [
-                    concept.cast && concept.cast.length ? concept.cast.slice(0, 3).join('    ').toUpperCase() : '',
-                    concept.director ? 'DIRECTED BY ' + concept.director.toUpperCase() : '',
-                    'A NEURAL PICTURES FILM',
-                    'NR  •  120 MINUTES',
-                    '© ' + new Date().getFullYear() + ' NEURAL PICTURES'
-                ].filter(Boolean);
+                    {
+                        text: concept.cast && concept.cast.length ? concept.cast.slice(0, 3).join('    ').toUpperCase() : '',
+                        type: 'cast'
+                    },
+                    {
+                        text: concept.director ? 'DIRECTED BY ' + concept.director.toUpperCase() : '',
+                        type: 'director'
+                    },
+                    {
+                        text: 'AN ABNORMAL STUDIOS FILM',
+                        type: 'studio'
+                    },
+                    {
+                        text: 'NR  •  ' + randomRuntime,
+                        type: 'rating'
+                    },
+                    {
+                        text: '© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS',
+                        type: 'copyright'
+                    }
+                ].filter(credit => credit.text);
 
-                let fontSize = Math.max(14, Math.floor(w / 50)); // FIXED: Smaller base font size
-                ctx.font = 'bold ' + fontSize + 'px Lato';
+                // Different font sizes for different credit types
+                const creditSizes = {
+                    cast: Math.max(16, Math.floor(w / 45)),
+                    director: Math.max(14, Math.floor(w / 50)), 
+                    studio: Math.max(18, Math.floor(w / 40)),    // Larger for studio
+                    rating: Math.max(12, Math.floor(w / 55)),    // Smaller for rating
+                    copyright: Math.max(10, Math.floor(w / 60))  // Smallest for copyright
+                };
                 
-                // FIXED: Calculate available space for credits
+                // Calculate available space for credits
                 const creditsStartY = h * 0.86;
-                const lineHeight = fontSize * 1.6;
-                const availableHeight = h - creditsStartY;
-                const maxLines = Math.floor(availableHeight / lineHeight);
+                let currentY = creditsStartY;
                 
-                // FIXED: Trim credits if they don't fit
-                const displayCredits = credits.slice(0, maxLines);
-                
-                displayCredits.forEach((line, index) => {
-                    // FIXED: Truncate line if it's too wide
-                    let displayLine = line;
+                credits.forEach((credit, index) => {
+                    if (!credit.text) return;
+                    
+                    const fontSize = creditSizes[credit.type] || creditSizes.rating;
+                    const lineHeight = fontSize * 1.6;
+                    
+                    // Check if we have space
+                    if (currentY + fontSize > h) return;
+                    
+                    ctx.font = 'bold ' + fontSize + 'px ' + styling.creditsFont;
+                    
+                    // Truncate line if it's too wide
+                    let displayLine = credit.text;
                     while (ctx.measureText(displayLine).width > maxTextWidth && displayLine.length > 10) {
                         displayLine = displayLine.substring(0, displayLine.length - 4) + '...';
                     }
                     
-                    const y = creditsStartY + index * lineHeight;
-                    
-                    // FIXED: Only render if within canvas bounds
-                    if (y < h - fontSize) {
-                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-                        ctx.lineWidth = 2;
-                        ctx.strokeText(displayLine, w / 2, y);
-                        
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-                        ctx.fillText(displayLine, w / 2, y);
+                    // Special styling for studio name
+                    if (credit.type === 'studio') {
+                        ctx.shadowColor = styling.titleGlow;
+                        ctx.shadowBlur = fontSize / 4;
+                    } else {
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+                        ctx.shadowBlur = fontSize / 6;
                     }
+                    
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeText(displayLine, w / 2, currentY);
+                    
+                    ctx.fillStyle = styling.creditsColor;
+                    ctx.fillText(displayLine, w / 2, currentY);
+                    
+                    currentY += lineHeight;
+                    ctx.shadowBlur = 0;
                 });
             }
 
