@@ -45,13 +45,25 @@ export default async function handler(req, res) {
         
         // Add creative themes to force variety
         const creativeThemes = [
-            'time manipulation', 'parallel dimensions', 'artificial consciousness', 'genetic memories',
-            'sound-based horror', 'color psychology', 'mathematical nightmares', 'botanical mutations',
-            'memory trading', 'gravity anomalies', 'digital archaeology', 'weather manipulation',
-            'architectural haunting', 'crystalline entities', 'quantum entanglement', 'sonic landscapes',
-            'molecular dissolution', 'temporal echoes', 'geometric demons', 'photographic souls',
-            'magnetic personalities', 'elastic reality', 'transparent beings', 'living architecture'
-        ];
+			'time manipulation', 'parallel dimensions', 'artificial consciousness', 'genetic memories',
+			'sound-based horror', 'color psychology', 'mathematical nightmares', 'botanical mutations',
+			'memory trading', 'gravity anomalies', 'digital archaeology', 'weather manipulation',
+			'architectural haunting', 'crystalline entities', 'quantum entanglement', 'sonic landscapes',
+			'molecular dissolution', 'temporal echoes', 'geometric demons', 'photographic souls',
+			'magnetic personalities', 'elastic reality', 'transparent beings', 'living architecture',
+			'vampiric transformations', 'lycanthropic cycles', 'demonic possession', 'ancient curses',
+			'necromantic rituals', 'haunted objects', 'spectral manifestations', 'cosmic dread',	
+			'eldritch abominations', 'body horror mutations', 'psychological fracturing', 'occult conspiracies',
+			'sacrificial ceremonies', 'plague manifestations', 'witch covens', 'ancestral sins',
+			'alien invasions', 'space exploration', 'cybernetic implants', 'genetic engineering',
+			'terraforming projects', 'interstellar travel', 'robotic uprising', 'clone societies',
+			'mind uploading', 'cryogenic revival', 'alien first contact', 'space colonies',
+			'technological singularity', 'virtual realities', 'bioengineered viruses', 'energy beings',
+			'sentient furniture', 'backwards aging', 'taste-based telepathy', 'numerical hauntings',
+			'gravity wells in rooms', 'color-eating entities', 'mirror dimension bleeding', 'sentient weather patterns',
+			'backwards speech prophecies', 'emotional parasites', 'dream archaeology', 'smell-based time travel',
+			'texture-shifting materials', 'sound-color synesthesia', 'magnetic emotions', 'liquid shadows',
+			'crystalline thoughts', 'paper-thin realities'        ];
         
         // Force a random theme to inject into the concept
         const forceTheme = creativeThemes[Math.floor(Math.random() * creativeThemes.length)];
