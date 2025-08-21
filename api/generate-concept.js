@@ -1,4 +1,6 @@
 // api/generate-concept.js - Vercel Serverless Function
+import { getApiKeys } from './config.js';
+
 export default async function handler(req, res) {
     // Enable CORS and Security Headers
     res.setHeader('Access-Control-Allow-Credentials', true);
@@ -21,6 +23,13 @@ export default async function handler(req, res) {
     }
 
     try {
+        // Get API keys using helper function
+        const { anthropicKey, hasAnthropic } = getApiKeys();
+        
+        if (!hasAnthropic) {
+            throw new Error('ANTHROPIC_API_KEY environment variable is missing or invalid');
+        }
+        
         const { genreFilter = 'any', eraFilter = 'any' } = req.body;
         
         // Enhanced genre mapping
@@ -67,7 +76,7 @@ Create something completely original and compelling.`;
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': process.env.ANTHROPIC_API_KEY,
+                'x-api-key': anthropicKey,
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
