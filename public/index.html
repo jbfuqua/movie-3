@@ -553,10 +553,16 @@
                             }
                         }
 
+                        // Set canvas size and apply crop
                         this.elements.canvas.width = targetW;
                         this.elements.canvas.height = targetH;
                         this.ctx.clearRect(0, 0, targetW, targetH);
                         this.ctx.drawImage(img, 0, bestCrop.y, targetW, targetH, 0, 0, targetW, targetH);
+                        
+                        // Set text rendering quality
+                        this.ctx.textRenderingOptimization = 'optimizeQuality';
+                        this.ctx.imageSmoothingEnabled = true;
+                        this.ctx.imageSmoothingQuality = 'high';
                         
                         // Clean up temp canvas
                         tempCanvas.width = 0;
@@ -575,17 +581,20 @@
                 const w = canvas.width;
                 const h = canvas.height;
 
-                const topGradient = ctx.createLinearGradient(0, 0, 0, h * 0.18);
-                topGradient.addColorStop(0, 'rgba(0, 0, 0, 0.45)');
+                // Enhanced gradients for better text readability
+                const topGradient = ctx.createLinearGradient(0, 0, 0, h * 0.25);
+                topGradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+                topGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
                 topGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
                 ctx.fillStyle = topGradient;
-                ctx.fillRect(0, 0, w, h * 0.18);
+                ctx.fillRect(0, 0, w, h * 0.25);
 
-                const bottomGradient = ctx.createLinearGradient(0, h, 0, h * 0.82);
-                bottomGradient.addColorStop(0, 'rgba(0, 0, 0, 0.60)');
+                const bottomGradient = ctx.createLinearGradient(0, h, 0, h * 0.75);
+                bottomGradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
+                bottomGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.4)');
                 bottomGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
                 ctx.fillStyle = bottomGradient;
-                ctx.fillRect(0, h * 0.82, w, h * 0.18);
+                ctx.fillRect(0, h * 0.75, w, h * 0.25);
             }
 
             renderTitleAndCredits(concept) {
