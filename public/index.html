@@ -298,6 +298,7 @@
                     : window.location.origin;
                 this.CONCEPT_API_URL = this.BACKEND_BASE_URL + '/api/generate-concept';
                 this.IMAGE_API_URL = this.BACKEND_BASE_URL + '/api/generate-image';
+                this.SONG_API_URL = this.BACKEND_BASE_URL + '/api/generate-song';
                 
                 this.isGenerating = false;
                 this.autoGenerate = false;
@@ -417,6 +418,7 @@
                     'concept': 'Generating concept...',
                     'image': 'Creating artwork...',
                     'text': 'Composing poster...',
+                    'song': 'Finding perfect soundtrack...',
                     'complete': 'Complete!'
                 };
                 
@@ -659,7 +661,8 @@
                 if (this.elements.synopsisText) this.elements.synopsisText.textContent = concept.synopsis || '-';
                 
                 this.generateInstagramCaption(concept);
-                this.generateSongRecommendation(concept);
+                // Generate AI-powered song recommendation
+                this.generateAISongRecommendation(concept);
             }
 
             generateInstagramCaption(concept) {
@@ -746,8 +749,8 @@
                 }
             }
 
-            generateSongRecommendation(concept) {
-                if (!concept.title) {
+            async generateAISongRecommendation(concept) {
+                if (!concept.title || !concept.synopsis) {
                     this.elements.songTitle.textContent = '-';
                     this.elements.songArtist.textContent = '-';
                     this.elements.songReason.textContent = '-';
@@ -755,11 +758,57 @@
                     return;
                 }
 
+                // Show loading state
+                this.elements.songTitle.textContent = 'Generating...';
+                this.elements.songArtist.textContent = 'AI is thinking...';
+                this.elements.songReason.textContent = 'Analyzing movie themes and finding the perfect soundtrack match...';
+                this.elements.copySongBtn.disabled = true;
+
+                try {
+                    console.log('Generating AI song recommendation...');
+                    
+                    const response = await fetch(this.SONG_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ concept })
+                    });
+
+                    const responseText = await response.text();
+
+                    if (!response.ok) {
+                        throw new Error('Song recommendation request failed: ' + response.status + ' - ' + responseText);
+                    }
+
+                    const result = JSON.parse(responseText);
+                    
+                    if (result.success && result.recommendation) {
+                        const rec = result.recommendation;
+                        
+                        this.elements.songTitle.textContent = rec.title;
+                        this.elements.songArtist.textContent = rec.artist + (rec.year ? ' (' + rec.year + ')' : '');
+                        this.elements.songReason.textContent = rec.reason;
+                        this.elements.copySongBtn.disabled = false;
+                        
+                        console.log('AI song recommendation generated:', rec);
+                    } else {
+                        throw new Error(result.error || 'Invalid response from song API');
+                    }
+                } catch (error) {
+                    console.error('Error generating AI song recommendation:', error);
+                    
+                    // Fallback to static recommendation
+                    console.log('Falling back to static song recommendation...');
+                    this.generateFallbackSongRecommendation(concept);
+                }
+            }
+
+            generateFallbackSongRecommendation(concept) {
+                // Fallback to the original static system if AI fails
                 const recommendation = this.getSongForMovie(concept);
                 
                 this.elements.songTitle.textContent = recommendation.title;
                 this.elements.songArtist.textContent = recommendation.artist;
-                this.elements.songReason.textContent = recommendation.reason;
+                this.elements.songReason.textContent = recommendation.reason + ' (Generated using fallback system)';
                 this.elements.copySongBtn.disabled = false;
             }
 
@@ -1074,7 +1123,11 @@
                     this.addGradientOverlays();
                     this.renderTitleAndCredits(concept);
                     
-                    // 4. Finalize
+                    // 4. Generate AI song recommendation
+                    this.updateProgress('song', 85);
+                    // Note: Song generation happens in updateInfo(), no need to wait for it
+                    
+                    // 5. Finalize
                     this.updateProgress('complete', 100);
                     const finalImageUrl = this.elements.canvas.toDataURL('image/png');
                     this.elements.posterImage.src = finalImageUrl;
