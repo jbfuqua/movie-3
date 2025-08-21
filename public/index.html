@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Generative Movie Poster AI - Enhanced</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -80,6 +80,33 @@
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: rgba(59, 130, 246, 0.6);
             border-radius: 3px;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .floating {
+                animation: none; /* Disable animation on mobile for performance */
+            }
+            
+            .glass-morphism {
+                backdrop-filter: blur(5px); /* Reduce blur on mobile */
+            }
+            
+            /* Larger touch targets */
+            button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            /* Prevent zoom on input focus */
+            input, select, textarea {
+                font-size: 16px;
+            }
+        }
+        
+        /* Improve mobile canvas performance */
+        canvas {
+            will-change: contents;
         }
     </style>
 </head>
@@ -373,7 +400,14 @@
                     }
                 } catch (error) {
                     console.error('Backend health check failed:', error);
-                    this.showError('Backend server not running. Please start the server and refresh.');
+                    
+                    // Mobile-specific error message
+                    const isMobile = window.innerWidth <= 768;
+                    const errorMsg = isMobile 
+                        ? 'Connection failed. Please check your internet connection and try again.'
+                        : 'Backend server not running. Please start the server and refresh.';
+                    
+                    this.showError(errorMsg);
                     this.updateStatus('error', 'Backend Offline');
                 }
             }
@@ -474,9 +508,11 @@
                 return new Promise((resolve) => {
                     const img = new Image();
                     img.onload = () => {
-                        const targetW = 1024;
+                        // Mobile optimization: use smaller canvas if on mobile
+                        const isMobile = window.innerWidth <= 768;
+                        const targetW = isMobile ? 512 : 1024; // Smaller on mobile
                         const targetH = Math.floor(targetW * 1.5);
-                        const step = 32;
+                        const step = isMobile ? 16 : 32; // Fewer samples on mobile
                         let bestCrop = { y: 0, score: -Infinity };
 
                         const tempCanvas = document.createElement('canvas');
@@ -494,7 +530,9 @@
                                 
                                 let sum = 0, sum2 = 0, count = 0;
                                 
-                                for (let i = 0; i < data.length; i += 16) {
+                                // Mobile: sample even more sparsely
+                                const sampleRate = isMobile ? 32 : 16;
+                                for (let i = 0; i < data.length; i += sampleRate) {
                                     const r = data[i], g = data[i + 1], b = data[i + 2];
                                     const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
                                     sum += brightness;
@@ -517,6 +555,10 @@
                         this.elements.canvas.height = targetH;
                         this.ctx.clearRect(0, 0, targetW, targetH);
                         this.ctx.drawImage(img, 0, bestCrop.y, targetW, targetH, 0, 0, targetW, targetH);
+                        
+                        // Clean up temp canvas
+                        tempCanvas.width = 0;
+                        tempCanvas.height = 0;
                         
                         resolve();
                     };
