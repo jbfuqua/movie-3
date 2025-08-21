@@ -134,6 +134,12 @@ INSPIRATION SOURCES (use as creative springboard, don't copy):
 - Abstract art movements
 - Philosophical paradoxes
 
+VISUAL ELEMENTS GUIDANCE:
+- Focus on atmospheric, cinematic compositions
+- Emphasize lighting, color, and mood over potentially problematic content
+- Think movie poster photography rather than explicit scenes
+- Keep visual descriptions suitable for general audiences while maintaining intrigue
+
 Return ONLY valid JSON:
 {
   "decade":"${forceRandomDecade || eraFilter}",
@@ -141,7 +147,7 @@ Return ONLY valid JSON:
   "title":"[completely unique ${randomTitleStyle} title]",
   "tagline":"[memorable hook that hasn't been used before]", 
   "synopsis":"[1-2 sentences with a concept so original it could win awards]",
-  "visual_elements":"[describe 1 striking focal image and 2-3 unique visual elements]",
+  "visual_elements":"[describe 1 striking focal image and 2-3 unique visual elements - keep family-friendly and focus on composition, lighting, and atmosphere rather than potentially concerning content]",
   "cast":["[${randomNameStyle}]","[unique name]","[distinctive name]"],
   "director":"[${randomNameStyle} director name]"
 }
