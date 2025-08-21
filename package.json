@@ -1,0 +1,26 @@
+{
+  "name": "movie-poster-ai-vercel",
+  "version": "1.0.0",
+  "description": "AI-powered movie poster generator deployed on Vercel",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "start": "vercel dev"
+  },
+  "keywords": [
+    "ai",
+    "movie",
+    "poster",
+    "claude",
+    "dall-e",
+    "vercel",
+    "serverless"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "^28.0.0"
+  }
+}
