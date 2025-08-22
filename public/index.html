@@ -304,8 +304,12 @@
 		   
 			async waitForFontsAndGenerate() {
 				try {
-					// Wait for fonts to load
-					await document.fonts.ready;
+					// Add timeout to prevent infinite waiting
+					const fontTimeout = new Promise((_, reject) => 
+						setTimeout(() => reject(new Error('Font loading timeout')), 10000)
+					);
+					
+					await Promise.race([document.fonts.ready, fontTimeout]);
 					console.log('Fonts loaded, starting generation');
 					
 					// Additional delay to ensure fonts are fully available
@@ -313,13 +317,13 @@
 						this.handleGeneration();
 					}, 500);
 				} catch (error) {
-					console.warn('Font loading failed, proceeding anyway:', error);
+					console.warn('Font loading failed or timed out, proceeding anyway:', error);
 					setTimeout(() => {
 						this.handleGeneration();
 					}, 2000);
 				}
 			}
-
+			
             initializeElements() {
                 console.log('Initializing DOM elements...');
                 this.elements = {
@@ -406,27 +410,38 @@
                 const self = this;
                 console.log('Setting up event listeners...');
                 
-                this.elements.generateBtn.addEventListener('click', function() { self.handleGeneration(); });
-                this.elements.autoToggle.addEventListener('click', function() { self.toggleAutoGenerate(); });
+				this.elements.generateBtn.addEventListener('click', function() { self.handleGenerationSafely(); });                this.elements.autoToggle.addEventListener('click', function() { self.toggleAutoGenerate(); });
                 this.elements.saveBtn.addEventListener('click', function() { self.savePoster(); });
                 this.elements.shareBtn.addEventListener('click', function() { self.sharePoster(); });
                 this.elements.retryBtn.addEventListener('click', function() { self.handleGeneration(); });
                 
-                this.elements.genreFilter.addEventListener('change', function() {
-                    if (!self.isGenerating) self.handleGeneration();
-                });
-                this.elements.eraFilter.addEventListener('change', function() {
-                    if (!self.isGenerating) self.handleGeneration();
-                });
-                this.elements.artStyleFilter.addEventListener('change', function() {
-                    if (!self.isGenerating) self.handleGeneration();
-                });
-                
+				this.elements.genreFilter.addEventListener('change', function() {
+					console.log('Genre filter changed to:', self.elements.genreFilter.value);
+				});
+				this.elements.eraFilter.addEventListener('change', function() {
+					console.log('Era filter changed to:', self.elements.eraFilter.value);
+				});
+				this.elements.artStyleFilter.addEventListener('change', function() {
+					console.log('Art style filter changed to:', self.elements.artStyleFilter.value);
+				});               
                 this.elements.copyCaptionBtn.addEventListener('click', function() { self.copyInstagramCaption(); });
                 this.elements.copySongBtn.addEventListener('click', function() { self.copySongInfo(); });
                 
                 console.log('Event listeners set up');
             }
+			
+			async handleGenerationSafely() {
+				// Prevent multiple simultaneous generations
+				if (this.isGenerating) {
+					console.log('Generation already in progress, ignoring request');
+					return;
+				}
+				
+				// Add a small delay to prevent UI blocking
+				setTimeout(() => {
+					this.handleGeneration();
+				}, 100);
+			}
 
             async checkBackendHealth() {
                 try {
@@ -1493,7 +1508,12 @@
 
             async handleGeneration() {
                 console.log('handleGeneration called');
-                
+
+				if (this.isGenerating) {
+					console.log('Generation already in progress, aborting');
+					return;
+				}
+                 
                 this.hideError();
                 this.setLoadingState(true);
                 this.updateInfo({ decade: '...', genre: '...', title: '...', tagline: '...', synopsis: '...' });
