@@ -770,7 +770,7 @@
                 // TITLE RENDERING WITH BETTER POSITIONING FOR 4:5 RATIO
                 const title = (concept.title || '').toUpperCase();
                 if (title) {
-                    let fontSize = Math.min(100, w / 9); // Slightly smaller max size
+                    let fontSize = Math.min(100, w / 9);
                     ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     
                     while (ctx.measureText(title).width > maxTextWidth && fontSize > 18) {
@@ -778,26 +778,7 @@
                         ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     }
 
-                    const titleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1); // Moved down from 0.15 to 0.18
-                    
-                    // Check if title will fit, if not, reduce font size further
-                    const titleHeight = titleLines.length * fontSize * 1.1;
-                    const titleStartY = h * 0.18 - (titleHeight / 2);
-                    
-                    if (titleStartY < h * 0.05) { // Too close to top
-                        while (titleStartY < h * 0.05 && fontSize > 16) {
-                            fontSize -= 2;
-                            ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
-                            const newTitleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1);
-                            const newTitleHeight = newTitleLines.length * fontSize * 1.1;
-                            const newTitleStartY = h * 0.18 - (newTitleHeight / 2);
-                            if (newTitleStartY >= h * 0.05) break;
-                        }
-                        // Recalculate with final font size
-                        const finalTitleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1);
-                        titleLines.length = 0;
-                        titleLines.push(...finalTitleLines);
-                    }
+                    const titleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1);
                     
                     ctx.shadowColor = styling.titleGlow;
                     ctx.shadowBlur = Math.max(fontSize / 4, 12);
