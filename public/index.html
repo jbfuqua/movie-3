@@ -82,29 +82,25 @@
             border-radius: 3px;
         }
         
-        /* Mobile optimizations */
         @media (max-width: 768px) {
             .floating {
-                animation: none; /* Disable animation on mobile for performance */
+                animation: none;
             }
             
             .glass-morphism {
-                backdrop-filter: blur(5px); /* Reduce blur on mobile */
+                backdrop-filter: blur(5px);
             }
             
-            /* Larger touch targets */
             button {
                 min-height: 44px;
                 min-width: 44px;
             }
             
-            /* Prevent zoom on input focus */
             input, select, textarea {
                 font-size: 16px;
             }
         }
         
-        /* Improve mobile canvas performance */
         canvas {
             will-change: contents;
         }
@@ -113,7 +109,6 @@
 <body class="text-gray-200 flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
 
     <div class="w-full max-w-7xl mx-auto">
-        <!-- Enhanced Header -->
         <header class="text-center mb-12 fade-in">
             <h1 class="text-5xl sm:text-7xl font-bebas tracking-wider gradient-text mb-4">
                 Generative Movie Poster AI
@@ -132,7 +127,6 @@
         </header>
 
         <main class="grid grid-cols-1 xl:grid-cols-4 gap-8">
-            <!-- Enhanced Poster Display -->
             <div class="xl:col-span-3 glass-morphism p-6 rounded-2xl shadow-2xl">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-montserrat font-bold text-white">Current Generation</h2>
@@ -163,9 +157,7 @@
                 </div>
             </div>
 
-            <!-- Enhanced Controls and Info -->
             <div class="xl:col-span-1 space-y-6">
-                <!-- Generation Controls -->
                 <div class="glass-morphism p-6 rounded-2xl">
                     <h3 class="text-xl font-montserrat font-bold text-white mb-4">Controls</h3>
                     <div class="space-y-4">
@@ -217,7 +209,6 @@
                     </div>
                 </div>
 
-                <!-- Movie Details -->
                 <div class="glass-morphism p-6 rounded-2xl custom-scrollbar max-h-96 overflow-y-auto">
                     <h3 class="text-xl font-montserrat font-bold text-white mb-4">Movie Details</h3>
                     <div id="movie-info" class="space-y-4">
@@ -274,18 +265,15 @@
                     </div>
                 </div>
 
-                <!-- Recent Generations -->
                 <div class="glass-morphism p-6 rounded-2xl">
                     <h3 class="text-xl font-montserrat font-bold text-white mb-4">Recent Generations</h3>
                     <div id="recent-posters" class="grid grid-cols-2 gap-2">
-                        <!-- Recent poster thumbnails will be added here -->
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Hidden canvas for image processing -->
     <canvas id="poster-canvas" class="hidden"></canvas>
 
     <script>
@@ -402,7 +390,6 @@
                 } catch (error) {
                     console.error('Backend health check failed:', error);
                     
-                    // Mobile-specific error message
                     const isMobile = window.innerWidth <= 768;
                     const errorMsg = isMobile 
                         ? 'Connection failed. Please check your internet connection and try again.'
@@ -506,119 +493,6 @@
                 }
             }
 
-            smartCropToInstagramRatio(imageUrl) {
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        // Mobile optimization: use smaller canvas if on mobile
-                        const isMobile = window.innerWidth <= 768;
-                        const targetW = isMobile ? 512 : 1024; 
-                        const targetH = Math.floor(targetW * 1.25); // 4:5 Instagram ratio instead of 1.5
-                        const step = isMobile ? 16 : 32; // Fewer samples on mobile
-                        let bestCrop = { y: 0, score: -Infinity };
-
-                        const tempCanvas = document.createElement('canvas');
-                        const tempCtx = tempCanvas.getContext('2d');
-                        tempCanvas.width = img.width;
-                        tempCanvas.height = img.height;
-                        tempCtx.drawImage(img, 0, 0);
-
-                        for (let y = 0; y <= img.height - targetH; y += step) {
-                            try {
-                                const sampleY = y + Math.floor(targetH * 0.25);
-                                const sampleH = Math.floor(targetH * 0.5);
-                                const imageData = tempCtx.getImageData(0, sampleY, targetW, sampleH);
-                                const data = imageData.data;
-                                
-                                let sum = 0, sum2 = 0, count = 0;
-                                
-                                // Mobile: sample even more sparsely
-                                const sampleRate = isMobile ? 32 : 16;
-                                for (let i = 0; i < data.length; i += sampleRate) {
-                                    const r = data[i], g = data[i + 1], b = data[i + 2];
-                                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-                                    sum += brightness;
-                                    sum2 += brightness * brightness;
-                                    count++;
-                                }
-                                
-                                const mean = sum / count;
-                                const variance = sum2 / count - mean * mean;
-                                
-                                if (variance > bestCrop.score) {
-                                    bestCrop = { y, score: variance };
-                                }
-                            } catch (error) {
-                                continue;
-                            }
-                        }
-
-                        // Set canvas size and apply crop
-                        this.elements.canvas.width = targetW;
-                        this.elements.canvas.height = targetH;
-                        this.ctx.clearRect(0, 0, targetW, targetH);
-                        this.ctx.drawImage(img, 0, bestCrop.y, targetW, targetH, 0, 0, targetW, targetH);
-                        
-                        // Set text rendering quality
-                        this.ctx.textRenderingOptimization = 'optimizeQuality';
-                        this.ctx.imageSmoothingEnabled = true;
-                        this.ctx.imageSmoothingQuality = 'high';
-                        
-                        // Clean up temp canvas
-                        tempCanvas.width = 0;
-                        tempCanvas.height = 0;
-                        
-                        resolve();
-                    };
-                    img.onerror = () => resolve();
-                    img.src = imageUrl;
-                });
-            }
-
-            addGradientOverlays() {
-                const canvas = this.elements.canvas;
-                const ctx = this.ctx;
-                const w = canvas.width;
-                const h = canvas.height;
-
-                // Enhanced gradients for better text readability
-                const topGradient = ctx.createLinearGradient(0, 0, 0, h * 0.25);
-                topGradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
-                topGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
-                topGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                ctx.fillStyle = topGradient;
-                ctx.fillRect(0, 0, w, h * 0.25);
-
-                const bottomGradient = ctx.createLinearGradient(0, h, 0, h * 0.75);
-                bottomGradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
-                bottomGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.4)');
-                bottomGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                ctx.fillStyle = bottomGradient;
-                ctx.fillRect(0, h * 0.75, w, h * 0.25);
-            }
-
-            // FIXED: Better text wrapping and overflow prevention
-            wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-                if (!text) return [];
-                
-                const words = text.split(' ');
-                const lines = [];
-                let currentLine = words[0];
-
-                for (let i = 1; i < words.length; i++) {
-                    const word = words[i];
-                    const width = ctx.measureText(currentLine + " " + word).width;
-                    if (width < maxWidth) {
-                        currentLine += " " + word;
-                    } else {
-                        lines.push(currentLine);
-                        currentLine = word;
-                    }
-                }
-                lines.push(currentLine);
-                return lines;
-            }
-
             getEraSpecificStyling(decade, genre) {
                 const isSciFi = (genre || '').toLowerCase().includes('sci-fi');
                 const isHorror = (genre || '').toLowerCase().includes('horror');
@@ -629,7 +503,7 @@
                         taglineFont: 'Lato',
                         creditsFont: 'Lato',
                         titleColor: '#ffffff',
-                        titleGlow: 'rgba(255, 215, 0, 0.8)', // Gold glow
+                        titleGlow: 'rgba(255, 215, 0, 0.8)',
                         taglineColor: 'rgba(255, 255, 255, 0.9)',
                         creditsColor: 'rgba(255, 255, 255, 0.85)'
                     },
@@ -665,7 +539,7 @@
                         taglineFont: 'Lato',
                         creditsFont: 'Lato',
                         titleColor: '#ffffff',
-                        titleGlow: 'rgba(128, 128, 128, 0.7)', // Silver glow
+                        titleGlow: 'rgba(128, 128, 128, 0.7)',
                         taglineColor: 'rgba(255, 255, 255, 0.9)',
                         creditsColor: 'rgba(255, 255, 255, 0.85)'
                     },
@@ -673,7 +547,7 @@
                         titleFont: 'Oswald',
                         taglineFont: 'Lato',
                         creditsFont: 'Lato',
-                        titleColor: isSciFi ? '#00ff41' : '#ffffff', // Matrix green for sci-fi
+                        titleColor: isSciFi ? '#00ff41' : '#ffffff',
                         titleGlow: isSciFi ? 'rgba(0, 255, 65, 0.8)' : 'rgba(255, 255, 255, 0.7)',
                         taglineColor: 'rgba(255, 255, 255, 0.9)',
                         creditsColor: 'rgba(255, 255, 255, 0.85)'
@@ -683,7 +557,7 @@
                         taglineFont: 'Poppins',
                         creditsFont: 'Lato',
                         titleColor: '#ffffff',
-                        titleGlow: 'rgba(59, 130, 246, 0.8)', // Blue glow
+                        titleGlow: 'rgba(59, 130, 246, 0.8)',
                         taglineColor: 'rgba(255, 255, 255, 0.9)',
                         creditsColor: 'rgba(255, 255, 255, 0.85)'
                     },
@@ -692,14 +566,127 @@
                         taglineFont: 'Poppins',
                         creditsFont: 'Lato',
                         titleColor: '#ffffff',
-                        titleGlow: 'rgba(0, 0, 0, 0.9)', // Subtle shadow only
+                        titleGlow: 'rgba(0, 0, 0, 0.9)',
                         taglineColor: 'rgba(255, 255, 255, 0.95)',
                         creditsColor: 'rgba(255, 255, 255, 0.9)'
                     }
                 };
                 
-                // Default fallback
                 return stylings[decade] || stylings['1980s'];
+            }
+
+            smartCropToInstagramRatio(imageUrl) {
+                const self = this;
+                return new Promise(function(resolve) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const isMobile = window.innerWidth <= 768;
+                        const targetW = isMobile ? 512 : 1024; 
+                        const targetH = Math.floor(targetW * 1.25);
+                        const step = isMobile ? 16 : 32;
+                        let bestCrop = { y: 0, score: -Infinity };
+
+                        const tempCanvas = document.createElement('canvas');
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCanvas.width = img.width;
+                        tempCanvas.height = img.height;
+                        tempCtx.drawImage(img, 0, 0);
+
+                        for (let y = 0; y <= img.height - targetH; y += step) {
+                            try {
+                                const sampleY = y + Math.floor(targetH * 0.25);
+                                const sampleH = Math.floor(targetH * 0.5);
+                                const imageData = tempCtx.getImageData(0, sampleY, targetW, sampleH);
+                                const data = imageData.data;
+                                
+                                let sum = 0;
+                                let sum2 = 0;
+                                let count = 0;
+                                const sampleRate = isMobile ? 32 : 16;
+                                
+                                for (let i = 0; i < data.length; i += sampleRate) {
+                                    const r = data[i];
+                                    const g = data[i + 1];
+                                    const b = data[i + 2];
+                                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                                    sum += brightness;
+                                    sum2 += brightness * brightness;
+                                    count++;
+                                }
+                                
+                                const mean = sum / count;
+                                const variance = sum2 / count - mean * mean;
+                                
+                                if (variance > bestCrop.score) {
+                                    bestCrop = { y: y, score: variance };
+                                }
+                            } catch (error) {
+                                continue;
+                            }
+                        }
+
+                        self.elements.canvas.width = targetW;
+                        self.elements.canvas.height = targetH;
+                        self.ctx.clearRect(0, 0, targetW, targetH);
+                        self.ctx.drawImage(img, 0, bestCrop.y, targetW, targetH, 0, 0, targetW, targetH);
+                        
+                        self.ctx.imageSmoothingEnabled = true;
+                        if (self.ctx.imageSmoothingQuality) {
+                            self.ctx.imageSmoothingQuality = 'high';
+                        }
+                        
+                        tempCanvas.width = 0;
+                        tempCanvas.height = 0;
+                        
+                        resolve();
+                    };
+                    img.onerror = function() {
+                        resolve();
+                    };
+                    img.src = imageUrl;
+                });
+            }
+
+            addGradientOverlays() {
+                const canvas = this.elements.canvas;
+                const ctx = this.ctx;
+                const w = canvas.width;
+                const h = canvas.height;
+
+                const topGradient = ctx.createLinearGradient(0, 0, 0, h * 0.25);
+                topGradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+                topGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+                topGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = topGradient;
+                ctx.fillRect(0, 0, w, h * 0.25);
+
+                const bottomGradient = ctx.createLinearGradient(0, h, 0, h * 0.75);
+                bottomGradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
+                bottomGradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.4)');
+                bottomGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = bottomGradient;
+                ctx.fillRect(0, h * 0.75, w, h * 0.25);
+            }
+
+            wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+                if (!text) return [];
+                
+                const words = text.split(' ');
+                const lines = [];
+                let currentLine = words[0];
+
+                for (let i = 1; i < words.length; i++) {
+                    const word = words[i];
+                    const width = ctx.measureText(currentLine + " " + word).width;
+                    if (width < maxWidth) {
+                        currentLine += " " + word;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    }
+                }
+                lines.push(currentLine);
+                return lines;
             }
 
             renderActorsCheckerboard(actors, ctx, startY, maxWidth, styling) {
@@ -713,8 +700,7 @@
                 
                 let currentY = startY;
                 
-                // Split actors into name and character
-                const actorData = actors.slice(0, 3).map(actor => {
+                const actorData = actors.slice(0, 3).map(function(actor) {
                     const parts = actor.split(' AS ');
                     return {
                         name: parts[0] || actor,
@@ -722,12 +708,12 @@
                     };
                 });
                 
-                actorData.forEach((actor, index) => {
-                    // Alternate positioning: left, right, center
+                for (let index = 0; index < actorData.length; index++) {
+                    const actor = actorData[index];
                     const positions = ['left', 'right', 'center'];
                     const position = positions[index % 3];
                     
-                    let xPos = w / 2; // Default center
+                    let xPos = w / 2;
                     let align = 'center';
                     
                     if (position === 'left') {
@@ -740,7 +726,6 @@
                     
                     ctx.textAlign = align;
                     
-                    // Render actor name (larger)
                     ctx.font = 'bold ' + actorFontSize + 'px ' + styling.creditsFont;
                     ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
                     ctx.shadowBlur = actorFontSize / 6;
@@ -748,9 +733,8 @@
                     ctx.lineWidth = 2;
                     ctx.fillStyle = styling.creditsColor;
                     
-                    // Truncate name if too long
                     let displayName = actor.name;
-                    const nameMaxWidth = maxWidth * 0.4; // Each column gets 40% of width
+                    const nameMaxWidth = maxWidth * 0.4;
                     while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 10) {
                         displayName = displayName.substring(0, displayName.length - 3) + '...';
                     }
@@ -758,7 +742,6 @@
                     ctx.strokeText(displayName, xPos, currentY);
                     ctx.fillText(displayName, xPos, currentY);
                     
-                    // Render character name (smaller, below actor name)
                     if (actor.character) {
                         ctx.font = 'italic ' + charFontSize + 'px ' + styling.creditsFont;
                         ctx.shadowBlur = charFontSize / 8;
@@ -773,9 +756,8 @@
                         ctx.fillText(displayChar, xPos, currentY + charFontSize * 1.2);
                     }
                     
-                    // Move to next position
-                    currentY += lineHeight * 1.8; // Extra space between actors
-                });
+                    currentY += lineHeight * 1.8;
+                }
                 
                 ctx.shadowBlur = 0;
                 return currentY;
@@ -790,97 +772,83 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                // Get era-specific styling
                 const styling = this.getEraSpecificStyling(concept.decade, concept.genre);
-
-                // Safe margins for text rendering
                 const safeMargin = w * 0.06;
                 const maxTextWidth = w - (safeMargin * 2);
 
-                // TITLE RENDERING WITH ERA-SPECIFIC STYLING
                 const title = (concept.title || '').toUpperCase();
                 if (title) {
                     let fontSize = Math.min(120, w / 8);
                     ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     
-                    // Reduce font size until it fits within safe bounds
                     while (ctx.measureText(title).width > maxTextWidth && fontSize > 20) {
                         fontSize -= 2;
                         ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     }
 
-                    // Wrap title if needed
                     const titleLines = this.wrapText(ctx, title, w / 2, h * 0.15, maxTextWidth, fontSize * 1.1);
                     
-                    // Era-specific glow effect
                     ctx.shadowColor = styling.titleGlow;
                     ctx.shadowBlur = Math.max(fontSize / 4, 15);
                     
-                    // Add outer glow for sci-fi/80s
                     if (concept.decade === '1980s' || (concept.genre || '').toLowerCase().includes('sci-fi')) {
                         ctx.strokeStyle = styling.titleGlow;
                         ctx.lineWidth = 3;
-                        titleLines.forEach((line, index) => {
-                            const yOffset = (index - (titleLines.length - 1) / 2) * fontSize * 1.1;
+                        for (let i = 0; i < titleLines.length; i++) {
+                            const line = titleLines[i];
+                            const yOffset = (i - (titleLines.length - 1) / 2) * fontSize * 1.1;
                             ctx.strokeText(line, w / 2, h * 0.15 + yOffset);
-                        });
+                        }
                     }
                     
                     ctx.fillStyle = styling.titleColor;
                     
-                    // Render each line of the title
-                    titleLines.forEach((line, index) => {
-                        const yOffset = (index - (titleLines.length - 1) / 2) * fontSize * 1.1;
+                    for (let i = 0; i < titleLines.length; i++) {
+                        const line = titleLines[i];
+                        const yOffset = (i - (titleLines.length - 1) / 2) * fontSize * 1.1;
                         ctx.fillText(line, w / 2, h * 0.15 + yOffset);
-                    });
+                    }
                     ctx.shadowBlur = 0;
                 }
 
-                // TAGLINE RENDERING WITH ERA-SPECIFIC STYLING
                 if (concept.tagline) {
                     const tagline = concept.tagline;
                     let fontSize = Math.max(16, Math.floor(w / 35));
                     ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     
-                    // Reduce font size if tagline is too wide
                     while (ctx.measureText(tagline).width > maxTextWidth && fontSize > 12) {
                         fontSize -= 1;
                         ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     }
                     
-                    // Wrap tagline if needed
                     const taglineLines = this.wrapText(ctx, tagline, w / 2, h * 0.24, maxTextWidth, fontSize * 1.3);
                     
-                    // Subtle shadow for tagline
                     ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
                     ctx.shadowBlur = fontSize / 3;
                     ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
                     ctx.lineWidth = 2;
                     ctx.fillStyle = styling.taglineColor;
                     
-                    taglineLines.forEach((line, index) => {
-                        const yOffset = (index - (taglineLines.length - 1) / 2) * fontSize * 1.3;
+                    for (let i = 0; i < taglineLines.length; i++) {
+                        const line = taglineLines[i];
+                        const yOffset = (i - (taglineLines.length - 1) / 2) * fontSize * 1.3;
                         const yPos = h * 0.24 + yOffset;
                         ctx.strokeText(line, w / 2, yPos);
                         ctx.fillText(line, w / 2, yPos);
-                    });
+                    }
                     ctx.shadowBlur = 0;
                 }
 
-                // CHECKERBOARD ACTORS AND VARIABLE CREDITS
                 const runtimes = ['89 MINUTES', '95 MINUTES', '103 MINUTES', '117 MINUTES', '124 MINUTES', '138 MINUTES'];
                 const randomRuntime = runtimes[Math.floor(Math.random() * runtimes.length)];
                 
-                // Calculate available space for credits - start higher to accommodate checkerboard actors
-                let creditsStartY = h * 0.82; // Start higher for more space
+                let creditsStartY = h * 0.82;
                 
-                // Render checkerboard actors first
                 if (concept.cast && concept.cast.length > 0) {
                     creditsStartY = this.renderActorsCheckerboard(concept.cast, ctx, creditsStartY, maxTextWidth, styling);
-                    creditsStartY += 20; // Add spacing after actors
+                    creditsStartY += 20;
                 }
                 
-                // Remaining credits (director, studio, rating, copyright)
                 const remainingCredits = [
                     {
                         text: concept.director ? 'DIRECTED BY ' + concept.director.toUpperCase() : '',
@@ -898,38 +866,34 @@
                         text: '© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS',
                         type: 'copyright'
                     }
-                ].filter(credit => credit.text);
+                ].filter(function(credit) { return credit.text; });
 
-                // Different font sizes for different credit types
                 const creditSizes = {
                     director: Math.max(14, Math.floor(w / 50)), 
-                    studio: Math.max(16, Math.floor(w / 45)),    // Larger for studio
-                    rating: Math.max(12, Math.floor(w / 55)),    // Smaller for rating
-                    copyright: Math.max(10, Math.floor(w / 60))  // Smallest for copyright
+                    studio: Math.max(16, Math.floor(w / 45)),
+                    rating: Math.max(12, Math.floor(w / 55)),
+                    copyright: Math.max(10, Math.floor(w / 60))
                 };
                 
-                // Render remaining credits centered
                 let currentY = creditsStartY;
                 ctx.textAlign = 'center';
                 
-                remainingCredits.forEach((credit, index) => {
-                    if (!credit.text) return;
+                for (let i = 0; i < remainingCredits.length; i++) {
+                    const credit = remainingCredits[i];
+                    if (!credit.text) continue;
                     
                     const fontSize = creditSizes[credit.type] || creditSizes.rating;
                     const lineHeight = fontSize * 1.6;
                     
-                    // Check if we have space
-                    if (currentY + fontSize > h - 10) return;
+                    if (currentY + fontSize > h - 10) continue;
                     
                     ctx.font = 'bold ' + fontSize + 'px ' + styling.creditsFont;
                     
-                    // Truncate line if it's too wide
                     let displayLine = credit.text;
                     while (ctx.measureText(displayLine).width > maxTextWidth && displayLine.length > 10) {
                         displayLine = displayLine.substring(0, displayLine.length - 4) + '...';
                     }
                     
-                    // Special styling for studio name
                     if (credit.type === 'studio') {
                         ctx.shadowColor = styling.titleGlow;
                         ctx.shadowBlur = fontSize / 4;
@@ -947,7 +911,7 @@
                     
                     currentY += lineHeight;
                     ctx.shadowBlur = 0;
-                });
+                }
             }
 
             updateInfo(concept) {
@@ -958,7 +922,6 @@
                 if (this.elements.synopsisText) this.elements.synopsisText.textContent = concept.synopsis || '-';
                 
                 this.generateInstagramCaption(concept);
-                // Generate AI-powered song recommendation
                 this.generateAISongRecommendation(concept);
             }
 
@@ -1055,7 +1018,6 @@
                     return;
                 }
 
-                // Show loading state
                 this.elements.songTitle.textContent = 'Generating...';
                 this.elements.songArtist.textContent = 'AI is thinking...';
                 this.elements.songReason.textContent = 'Analyzing movie themes and finding the perfect soundtrack match...';
@@ -1092,15 +1054,12 @@
                     }
                 } catch (error) {
                     console.error('Error generating AI song recommendation:', error);
-                    
-                    // Fallback to static recommendation
                     console.log('Falling back to static song recommendation...');
                     this.generateFallbackSongRecommendation(concept);
                 }
             }
 
             generateFallbackSongRecommendation(concept) {
-                // Fallback to the original static system if AI fails
                 const recommendation = this.getSongForMovie(concept);
                 
                 this.elements.songTitle.textContent = recommendation.title;
@@ -1394,7 +1353,6 @@
                 this.updateInfo({ decade: '...', genre: '...', title: '...', tagline: '...', synopsis: '...' });
 
                 try {
-                    // 1. Generate concept
                     this.updateProgress('concept', 10);
                     const concept = await this.generateMovieConcept();
                     if (!concept) {
@@ -1406,7 +1364,6 @@
                     this.currentConcept = concept;
                     this.updateInfo(concept);
 
-                    // 2. Generate image
                     this.updateProgress('image', 40);
                     const baseImageUrl = await this.generateImage(concept.visual_elements, concept);
                     if (!baseImageUrl) {
@@ -1414,17 +1371,13 @@
                         return;
                     }
 
-                    // 3. Smart crop and compose
                     this.updateProgress('text', 70);
-                    await this.smartCropToTwoThirds(baseImageUrl);
+                    await this.smartCropToInstagramRatio(baseImageUrl);
                     this.addGradientOverlays();
                     this.renderTitleAndCredits(concept);
                     
-                    // 4. Generate AI song recommendation
                     this.updateProgress('song', 85);
-                    // Note: Song generation happens in updateInfo(), no need to wait for it
                     
-                    // 5. Finalize
                     this.updateProgress('complete', 100);
                     const finalImageUrl = this.elements.canvas.toDataURL('image/png');
                     this.elements.posterImage.src = finalImageUrl;
