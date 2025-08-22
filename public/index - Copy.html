@@ -1,26 +1,4 @@
-renderTitleAndCredits(concept) {
-                const canvas = this.elements.canvas;
-                const ctx = this.ctx;
-                const w = canvas.width;
-                const h = canvas.height;
-
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-
-                const styling = this.getEraSpecificStyling(concept.decade, concept.genre);
-                const safeMargin = w * 0.08; // Increased margin for safety
-                const maxTextWidth = w - (safeMargin * 2);
-
-                // TITLE WITH BETTER 4:5 RATIO POSITIONING
-                const title = (concept.title || '').toUpperCase();
-                if (title) {
-                    let fontSize = Math.min(100, w / 10); // Reduced max size
-                    ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
-                    
-                    // First check width
-                    while (ctx.measureText(title).width > maxTextWidth && fontSize > 20) {
-                        fontSize -= 2;
-                        ctx.font = 'bold ' + fontSize + <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -786,32 +764,31 @@ renderTitleAndCredits(concept) {
                 ctx.textBaseline = 'middle';
 
                 const styling = this.getEraSpecificStyling(concept.decade, concept.genre);
-                const safeMargin = w * 0.08; // Increased from 0.06 for better safety
+                const safeMargin = w * 0.06;
                 const maxTextWidth = w - (safeMargin * 2);
 
-                // TITLE RENDERING WITH BETTER POSITIONING FOR 4:5 RATIO
                 const title = (concept.title || '').toUpperCase();
                 if (title) {
-                    let fontSize = Math.min(100, w / 9);
+                    let fontSize = Math.min(120, w / 8);
                     ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     
-                    while (ctx.measureText(title).width > maxTextWidth && fontSize > 18) {
+                    while (ctx.measureText(title).width > maxTextWidth && fontSize > 20) {
                         fontSize -= 2;
                         ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     }
 
-                    const titleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1);
+                    const titleLines = this.wrapText(ctx, title, w / 2, h * 0.15, maxTextWidth, fontSize * 1.1);
                     
                     ctx.shadowColor = styling.titleGlow;
-                    ctx.shadowBlur = Math.max(fontSize / 4, 12);
+                    ctx.shadowBlur = Math.max(fontSize / 4, 15);
                     
                     if (concept.decade === '1980s' || (concept.genre || '').toLowerCase().includes('sci-fi')) {
                         ctx.strokeStyle = styling.titleGlow;
-                        ctx.lineWidth = 2;
+                        ctx.lineWidth = 3;
                         for (let i = 0; i < titleLines.length; i++) {
                             const line = titleLines[i];
                             const yOffset = (i - (titleLines.length - 1) / 2) * fontSize * 1.1;
-                            ctx.strokeText(line, w / 2, h * 0.18 + yOffset);
+                            ctx.strokeText(line, w / 2, h * 0.15 + yOffset);
                         }
                     }
                     
@@ -820,23 +797,22 @@ renderTitleAndCredits(concept) {
                     for (let i = 0; i < titleLines.length; i++) {
                         const line = titleLines[i];
                         const yOffset = (i - (titleLines.length - 1) / 2) * fontSize * 1.1;
-                        ctx.fillText(line, w / 2, h * 0.18 + yOffset);
+                        ctx.fillText(line, w / 2, h * 0.15 + yOffset);
                     }
                     ctx.shadowBlur = 0;
                 }
 
-                // TAGLINE POSITIONING ADJUSTED
                 if (concept.tagline) {
                     const tagline = concept.tagline;
-                    let fontSize = Math.max(15, Math.floor(w / 38)); // Slightly smaller
+                    let fontSize = Math.max(16, Math.floor(w / 35));
                     ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     
-                    while (ctx.measureText(tagline).width > maxTextWidth && fontSize > 11) {
+                    while (ctx.measureText(tagline).width > maxTextWidth && fontSize > 12) {
                         fontSize -= 1;
                         ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     }
                     
-                    const taglineLines = this.wrapText(ctx, tagline, w / 2, h * 0.28, maxTextWidth, fontSize * 1.3); // Moved down from 0.24 to 0.28
+                    const taglineLines = this.wrapText(ctx, tagline, w / 2, h * 0.24, maxTextWidth, fontSize * 1.3);
                     
                     ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
                     ctx.shadowBlur = fontSize / 3;
@@ -847,7 +823,7 @@ renderTitleAndCredits(concept) {
                     for (let i = 0; i < taglineLines.length; i++) {
                         const line = taglineLines[i];
                         const yOffset = (i - (taglineLines.length - 1) / 2) * fontSize * 1.3;
-                        const yPos = h * 0.28 + yOffset;
+                        const yPos = h * 0.24 + yOffset;
                         ctx.strokeText(line, w / 2, yPos);
                         ctx.fillText(line, w / 2, yPos);
                     }
@@ -857,7 +833,7 @@ renderTitleAndCredits(concept) {
                 const runtimes = ['89 MINUTES', '95 MINUTES', '103 MINUTES', '117 MINUTES', '124 MINUTES', '138 MINUTES'];
                 const randomRuntime = runtimes[Math.floor(Math.random() * runtimes.length)];
                 
-                let creditsStartY = h * 0.74; // Start even higher due to title adjustments // Start even higher to fit everything
+                let creditsStartY = h * 0.78; // Start even higher to fit everything
                 
                 if (concept.cast && concept.cast.length > 0) {
                     creditsStartY = this.renderActorsCheckerboard(concept.cast, ctx, creditsStartY, maxTextWidth, styling);
