@@ -1,26 +1,4 @@
-renderTitleAndCredits(concept) {
-                const canvas = this.elements.canvas;
-                const ctx = this.ctx;
-                const w = canvas.width;
-                const h = canvas.height;
-
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-
-                const styling = this.getEraSpecificStyling(concept.decade, concept.genre);
-                const safeMargin = w * 0.08; // Increased margin for safety
-                const maxTextWidth = w - (safeMargin * 2);
-
-                // TITLE WITH BETTER 4:5 RATIO POSITIONING
-                const title = (concept.title || '').toUpperCase();
-                if (title) {
-                    let fontSize = Math.min(100, w / 10); // Reduced max size
-                    ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
-                    
-                    // First check width
-                    while (ctx.measureText(title).width > maxTextWidth && fontSize > 20) {
-                        fontSize -= 2;
-                        ctx.font = 'bold ' + fontSize + <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
