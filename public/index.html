@@ -506,14 +506,14 @@
                 }
             }
 
-            smartCropToTwoThirds(imageUrl) {
+            smartCropToInstagramRatio(imageUrl) {
                 return new Promise((resolve) => {
                     const img = new Image();
                     img.onload = () => {
                         // Mobile optimization: use smaller canvas if on mobile
                         const isMobile = window.innerWidth <= 768;
-                        const targetW = isMobile ? 512 : 1024; // Smaller on mobile
-                        const targetH = Math.floor(targetW * 1.5);
+                        const targetW = isMobile ? 512 : 1024; 
+                        const targetH = Math.floor(targetW * 1.25); // 4:5 Instagram ratio instead of 1.5
                         const step = isMobile ? 16 : 32; // Fewer samples on mobile
                         let bestCrop = { y: 0, score: -Infinity };
 
@@ -702,6 +702,85 @@
                 return stylings[decade] || stylings['1980s'];
             }
 
+            renderActorsCheckerboard(actors, ctx, startY, maxWidth, styling) {
+                if (!actors || actors.length === 0) return startY;
+                
+                const canvas = this.elements.canvas;
+                const w = canvas.width;
+                const actorFontSize = Math.max(14, Math.floor(w / 50));
+                const charFontSize = Math.max(12, Math.floor(w / 55));
+                const lineHeight = actorFontSize * 1.4;
+                
+                let currentY = startY;
+                
+                // Split actors into name and character
+                const actorData = actors.slice(0, 3).map(actor => {
+                    const parts = actor.split(' AS ');
+                    return {
+                        name: parts[0] || actor,
+                        character: parts[1] || ''
+                    };
+                });
+                
+                actorData.forEach((actor, index) => {
+                    // Alternate positioning: left, right, center
+                    const positions = ['left', 'right', 'center'];
+                    const position = positions[index % 3];
+                    
+                    let xPos = w / 2; // Default center
+                    let align = 'center';
+                    
+                    if (position === 'left') {
+                        xPos = w * 0.25;
+                        align = 'center';
+                    } else if (position === 'right') {
+                        xPos = w * 0.75;
+                        align = 'center';
+                    }
+                    
+                    ctx.textAlign = align;
+                    
+                    // Render actor name (larger)
+                    ctx.font = 'bold ' + actorFontSize + 'px ' + styling.creditsFont;
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+                    ctx.shadowBlur = actorFontSize / 6;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = styling.creditsColor;
+                    
+                    // Truncate name if too long
+                    let displayName = actor.name;
+                    const nameMaxWidth = maxWidth * 0.4; // Each column gets 40% of width
+                    while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 10) {
+                        displayName = displayName.substring(0, displayName.length - 3) + '...';
+                    }
+                    
+                    ctx.strokeText(displayName, xPos, currentY);
+                    ctx.fillText(displayName, xPos, currentY);
+                    
+                    // Render character name (smaller, below actor name)
+                    if (actor.character) {
+                        ctx.font = 'italic ' + charFontSize + 'px ' + styling.creditsFont;
+                        ctx.shadowBlur = charFontSize / 8;
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                        
+                        let displayChar = 'AS ' + actor.character;
+                        while (ctx.measureText(displayChar).width > nameMaxWidth && displayChar.length > 10) {
+                            displayChar = displayChar.substring(0, displayChar.length - 3) + '...';
+                        }
+                        
+                        ctx.strokeText(displayChar, xPos, currentY + charFontSize * 1.2);
+                        ctx.fillText(displayChar, xPos, currentY + charFontSize * 1.2);
+                    }
+                    
+                    // Move to next position
+                    currentY += lineHeight * 1.8; // Extra space between actors
+                });
+                
+                ctx.shadowBlur = 0;
+                return currentY;
+            }
+
             renderTitleAndCredits(concept) {
                 const canvas = this.elements.canvas;
                 const ctx = this.ctx;
@@ -788,15 +867,21 @@
                     ctx.shadowBlur = 0;
                 }
 
-                // VARIABLE RUNTIME AND CREDITS
+                // CHECKERBOARD ACTORS AND VARIABLE CREDITS
                 const runtimes = ['89 MINUTES', '95 MINUTES', '103 MINUTES', '117 MINUTES', '124 MINUTES', '138 MINUTES'];
                 const randomRuntime = runtimes[Math.floor(Math.random() * runtimes.length)];
                 
-                const credits = [
-                    {
-                        text: concept.cast && concept.cast.length ? concept.cast.slice(0, 3).join('    ').toUpperCase() : '',
-                        type: 'cast'
-                    },
+                // Calculate available space for credits - start higher to accommodate checkerboard actors
+                let creditsStartY = h * 0.82; // Start higher for more space
+                
+                // Render checkerboard actors first
+                if (concept.cast && concept.cast.length > 0) {
+                    creditsStartY = this.renderActorsCheckerboard(concept.cast, ctx, creditsStartY, maxTextWidth, styling);
+                    creditsStartY += 20; // Add spacing after actors
+                }
+                
+                // Remaining credits (director, studio, rating, copyright)
+                const remainingCredits = [
                     {
                         text: concept.director ? 'DIRECTED BY ' + concept.director.toUpperCase() : '',
                         type: 'director'
@@ -817,25 +902,24 @@
 
                 // Different font sizes for different credit types
                 const creditSizes = {
-                    cast: Math.max(16, Math.floor(w / 45)),
                     director: Math.max(14, Math.floor(w / 50)), 
-                    studio: Math.max(18, Math.floor(w / 40)),    // Larger for studio
+                    studio: Math.max(16, Math.floor(w / 45)),    // Larger for studio
                     rating: Math.max(12, Math.floor(w / 55)),    // Smaller for rating
                     copyright: Math.max(10, Math.floor(w / 60))  // Smallest for copyright
                 };
                 
-                // Calculate available space for credits
-                const creditsStartY = h * 0.86;
+                // Render remaining credits centered
                 let currentY = creditsStartY;
+                ctx.textAlign = 'center';
                 
-                credits.forEach((credit, index) => {
+                remainingCredits.forEach((credit, index) => {
                     if (!credit.text) return;
                     
                     const fontSize = creditSizes[credit.type] || creditSizes.rating;
                     const lineHeight = fontSize * 1.6;
                     
                     // Check if we have space
-                    if (currentY + fontSize > h) return;
+                    if (currentY + fontSize > h - 10) return;
                     
                     ctx.font = 'bold ' + fontSize + 'px ' + styling.creditsFont;
                     
