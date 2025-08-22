@@ -352,7 +352,7 @@
                     
                     errorMessage: document.getElementById('error-message'),
                     errorText: document.getElementById('error-text'),
-                    retryBtn: document.getElementById('retry-btn'),
+						retryBtn: document.getElementById('retry-btn'),
                     
                     recentPosters: document.getElementById('recent-posters'),
                     canvas: document.getElementById('poster-canvas')
@@ -362,6 +362,24 @@
                 console.log('DOM elements initialized');
 				this.setupCanvasForHighDPI();
             }
+			
+			async waitForFontsAndGenerate() {
+				try {
+					// Wait for fonts to load
+					await document.fonts.ready;
+					console.log('Fonts loaded, starting generation');
+					
+					// Additional delay to ensure fonts are fully available
+					setTimeout(() => {
+						this.handleGeneration();
+					}, 500);
+				} catch (error) {
+					console.warn('Font loading failed, proceeding anyway:', error);
+					setTimeout(() => {
+						this.handleGeneration();
+					}, 2000);
+				}
+			}
 
 			setupCanvasForHighDPI() {
 				const canvas = this.elements.canvas;
