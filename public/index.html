@@ -300,23 +300,25 @@
                 this.checkBackendHealth();
                 this.waitForFontsAndGenerate();
 				
-				async waitForFontsAndGenerate() {
-					try {
-						// Wait for fonts to load
-						await document.fonts.ready;
-						console.log('Fonts loaded, starting generation');
-        
-						// Additional delay to ensure fonts are fully available
-						setTimeout(() => {
-							this.handleGeneration();
-						}, 500);
-    } catch (error) {
-        console.warn('Font loading failed, proceeding anyway:', error);
-        setTimeout(() => {
-            this.handleGeneration();
-        }, 2000);
-    }
-}           }
+           }
+		   
+			async waitForFontsAndGenerate() {
+				try {
+					// Wait for fonts to load
+					await document.fonts.ready;
+					console.log('Fonts loaded, starting generation');
+					
+					// Additional delay to ensure fonts are fully available
+					setTimeout(() => {
+						this.handleGeneration();
+					}, 500);
+				} catch (error) {
+					console.warn('Font loading failed, proceeding anyway:', error);
+					setTimeout(() => {
+						this.handleGeneration();
+					}, 2000);
+				}
+			}
 
             initializeElements() {
                 console.log('Initializing DOM elements...');
@@ -808,6 +810,71 @@
 				ctx.textBaseline = originalTextBaseline;
 				
 				return measurement;
+			}
+			
+			renderActorsCheckerboard(actors, ctx, startY, maxWidth, styling) {
+				if (!actors || actors.length === 0) return startY;
+				
+				const canvas = this.elements.canvas;
+				const w = canvas.width;
+				const actorFontSize = Math.max(14, Math.floor(w / 50));
+				const charFontSize = Math.max(12, Math.floor(w / 55));
+				const lineHeight = actorFontSize * 2.2;
+				
+				let currentY = startY;
+				
+				const actorData = actors.slice(0, 3).map(function(actor) {
+					const parts = actor.split(' AS ');
+					return {
+						name: parts[0] || actor,
+						character: parts[1] || ''
+					};
+				});
+				
+				for (let index = 0; index < actorData.length; index++) {
+					const actor = actorData[index];
+					
+					// Simple left/right alternating, with first actor centered
+					let xPos = w / 2; // Start with center
+					if (index === 1) xPos = w * 0.3; // Second actor left
+					if (index === 2) xPos = w * 0.7; // Third actor right
+					
+					ctx.textAlign = 'center';
+					
+					ctx.font = 'bold ' + actorFontSize + 'px ' + styling.creditsFont;
+					ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+					ctx.shadowBlur = actorFontSize / 6;
+					ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+					ctx.lineWidth = 2;
+					ctx.fillStyle = styling.creditsColor;
+					
+					let displayName = actor.name;
+					const nameMaxWidth = maxWidth * 0.3; // Give more space per actor
+					while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 10) {
+						displayName = displayName.substring(0, displayName.length - 3) + '...';
+					}
+					
+					ctx.strokeText(displayName, xPos, currentY);
+					ctx.fillText(displayName, xPos, currentY);
+					
+					if (actor.character) {
+						ctx.font = 'italic ' + charFontSize + 'px ' + styling.creditsFont;
+						ctx.shadowBlur = charFontSize / 8;
+						ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+						
+						let displayChar = 'AS ' + actor.character;
+						while (ctx.measureText(displayChar).width > nameMaxWidth && displayChar.length > 10) {
+							displayChar = displayChar.substring(0, displayChar.length - 3) + '...';
+						}
+						
+						ctx.strokeText(displayChar, xPos, currentY + charFontSize * 1.4);
+						ctx.fillText(displayChar, xPos, currentY + charFontSize * 1.4);
+					}
+				}
+				
+				// Return Y position after ALL actors (not after each one)
+				ctx.shadowBlur = 0;
+				return currentY + lineHeight;
 			}
 
             renderTitleAndCredits(concept) {
