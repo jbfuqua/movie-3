@@ -696,7 +696,7 @@
                 const w = canvas.width;
                 const actorFontSize = Math.max(14, Math.floor(w / 50));
                 const charFontSize = Math.max(12, Math.floor(w / 55));
-                const lineHeight = actorFontSize * 1.4;
+                const lineHeight = actorFontSize * 2.2;
                 
                 let currentY = startY;
                 
@@ -710,21 +710,13 @@
                 
                 for (let index = 0; index < actorData.length; index++) {
                     const actor = actorData[index];
-                    const positions = ['left', 'right', 'center'];
-                    const position = positions[index % 3];
                     
-                    let xPos = w / 2;
-                    let align = 'center';
+                    // Simple left/right alternating, with first actor centered
+                    let xPos = w / 2; // Start with center
+                    if (index === 1) xPos = w * 0.3; // Second actor left
+                    if (index === 2) xPos = w * 0.7; // Third actor right
                     
-                    if (position === 'left') {
-                        xPos = w * 0.25;
-                        align = 'center';
-                    } else if (position === 'right') {
-                        xPos = w * 0.75;
-                        align = 'center';
-                    }
-                    
-                    ctx.textAlign = align;
+                    ctx.textAlign = 'center';
                     
                     ctx.font = 'bold ' + actorFontSize + 'px ' + styling.creditsFont;
                     ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
@@ -734,7 +726,7 @@
                     ctx.fillStyle = styling.creditsColor;
                     
                     let displayName = actor.name;
-                    const nameMaxWidth = maxWidth * 0.4;
+                    const nameMaxWidth = maxWidth * 0.3; // Give more space per actor
                     while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 10) {
                         displayName = displayName.substring(0, displayName.length - 3) + '...';
                     }
@@ -752,15 +744,14 @@
                             displayChar = displayChar.substring(0, displayChar.length - 3) + '...';
                         }
                         
-                        ctx.strokeText(displayChar, xPos, currentY + charFontSize * 1.2);
-                        ctx.fillText(displayChar, xPos, currentY + charFontSize * 1.2);
+                        ctx.strokeText(displayChar, xPos, currentY + charFontSize * 1.4);
+                        ctx.fillText(displayChar, xPos, currentY + charFontSize * 1.4);
                     }
-                    
-                    currentY += lineHeight * 1.8;
                 }
                 
+                // Return Y position after ALL actors (not after each one)
                 ctx.shadowBlur = 0;
-                return currentY;
+                return currentY + lineHeight;
             }
 
             renderTitleAndCredits(concept) {
@@ -773,31 +764,51 @@
                 ctx.textBaseline = 'middle';
 
                 const styling = this.getEraSpecificStyling(concept.decade, concept.genre);
-                const safeMargin = w * 0.06;
+                const safeMargin = w * 0.08; // Increased from 0.06 for better safety
                 const maxTextWidth = w - (safeMargin * 2);
 
+                // TITLE RENDERING WITH BETTER POSITIONING FOR 4:5 RATIO
                 const title = (concept.title || '').toUpperCase();
                 if (title) {
-                    let fontSize = Math.min(120, w / 8);
+                    let fontSize = Math.min(100, w / 9); // Slightly smaller max size
                     ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     
-                    while (ctx.measureText(title).width > maxTextWidth && fontSize > 20) {
+                    while (ctx.measureText(title).width > maxTextWidth && fontSize > 18) {
                         fontSize -= 2;
                         ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
                     }
 
-                    const titleLines = this.wrapText(ctx, title, w / 2, h * 0.15, maxTextWidth, fontSize * 1.1);
+                    const titleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1); // Moved down from 0.15 to 0.18
+                    
+                    // Check if title will fit, if not, reduce font size further
+                    const titleHeight = titleLines.length * fontSize * 1.1;
+                    const titleStartY = h * 0.18 - (titleHeight / 2);
+                    
+                    if (titleStartY < h * 0.05) { // Too close to top
+                        while (titleStartY < h * 0.05 && fontSize > 16) {
+                            fontSize -= 2;
+                            ctx.font = 'bold ' + fontSize + 'px ' + styling.titleFont;
+                            const newTitleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1);
+                            const newTitleHeight = newTitleLines.length * fontSize * 1.1;
+                            const newTitleStartY = h * 0.18 - (newTitleHeight / 2);
+                            if (newTitleStartY >= h * 0.05) break;
+                        }
+                        // Recalculate with final font size
+                        const finalTitleLines = this.wrapText(ctx, title, w / 2, h * 0.18, maxTextWidth, fontSize * 1.1);
+                        titleLines.length = 0;
+                        titleLines.push(...finalTitleLines);
+                    }
                     
                     ctx.shadowColor = styling.titleGlow;
-                    ctx.shadowBlur = Math.max(fontSize / 4, 15);
+                    ctx.shadowBlur = Math.max(fontSize / 4, 12);
                     
                     if (concept.decade === '1980s' || (concept.genre || '').toLowerCase().includes('sci-fi')) {
                         ctx.strokeStyle = styling.titleGlow;
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 2;
                         for (let i = 0; i < titleLines.length; i++) {
                             const line = titleLines[i];
                             const yOffset = (i - (titleLines.length - 1) / 2) * fontSize * 1.1;
-                            ctx.strokeText(line, w / 2, h * 0.15 + yOffset);
+                            ctx.strokeText(line, w / 2, h * 0.18 + yOffset);
                         }
                     }
                     
@@ -806,22 +817,23 @@
                     for (let i = 0; i < titleLines.length; i++) {
                         const line = titleLines[i];
                         const yOffset = (i - (titleLines.length - 1) / 2) * fontSize * 1.1;
-                        ctx.fillText(line, w / 2, h * 0.15 + yOffset);
+                        ctx.fillText(line, w / 2, h * 0.18 + yOffset);
                     }
                     ctx.shadowBlur = 0;
                 }
 
+                // TAGLINE POSITIONING ADJUSTED
                 if (concept.tagline) {
                     const tagline = concept.tagline;
-                    let fontSize = Math.max(16, Math.floor(w / 35));
+                    let fontSize = Math.max(15, Math.floor(w / 38)); // Slightly smaller
                     ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     
-                    while (ctx.measureText(tagline).width > maxTextWidth && fontSize > 12) {
+                    while (ctx.measureText(tagline).width > maxTextWidth && fontSize > 11) {
                         fontSize -= 1;
                         ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
                     }
                     
-                    const taglineLines = this.wrapText(ctx, tagline, w / 2, h * 0.24, maxTextWidth, fontSize * 1.3);
+                    const taglineLines = this.wrapText(ctx, tagline, w / 2, h * 0.28, maxTextWidth, fontSize * 1.3); // Moved down from 0.24 to 0.28
                     
                     ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
                     ctx.shadowBlur = fontSize / 3;
@@ -832,7 +844,7 @@
                     for (let i = 0; i < taglineLines.length; i++) {
                         const line = taglineLines[i];
                         const yOffset = (i - (taglineLines.length - 1) / 2) * fontSize * 1.3;
-                        const yPos = h * 0.24 + yOffset;
+                        const yPos = h * 0.28 + yOffset;
                         ctx.strokeText(line, w / 2, yPos);
                         ctx.fillText(line, w / 2, yPos);
                     }
@@ -842,11 +854,11 @@
                 const runtimes = ['89 MINUTES', '95 MINUTES', '103 MINUTES', '117 MINUTES', '124 MINUTES', '138 MINUTES'];
                 const randomRuntime = runtimes[Math.floor(Math.random() * runtimes.length)];
                 
-                let creditsStartY = h * 0.82;
+                let creditsStartY = h * 0.74; // Start even higher due to title adjustments // Start even higher to fit everything
                 
                 if (concept.cast && concept.cast.length > 0) {
                     creditsStartY = this.renderActorsCheckerboard(concept.cast, ctx, creditsStartY, maxTextWidth, styling);
-                    creditsStartY += 20;
+                    creditsStartY += 15; // Smaller gap after actors
                 }
                 
                 const remainingCredits = [
@@ -869,10 +881,10 @@
                 ].filter(function(credit) { return credit.text; });
 
                 const creditSizes = {
-                    director: Math.max(14, Math.floor(w / 50)), 
-                    studio: Math.max(16, Math.floor(w / 45)),
-                    rating: Math.max(12, Math.floor(w / 55)),
-                    copyright: Math.max(10, Math.floor(w / 60))
+                    director: Math.max(12, Math.floor(w / 55)), 
+                    studio: Math.max(14, Math.floor(w / 50)),    
+                    rating: Math.max(11, Math.floor(w / 60)),    
+                    copyright: Math.max(9, Math.floor(w / 65))  
                 };
                 
                 let currentY = creditsStartY;
@@ -883,9 +895,9 @@
                     if (!credit.text) continue;
                     
                     const fontSize = creditSizes[credit.type] || creditSizes.rating;
-                    const lineHeight = fontSize * 1.6;
+                    const lineHeight = fontSize * 1.4; // Tighter spacing
                     
-                    if (currentY + fontSize > h - 10) continue;
+                    if (currentY + fontSize > h - 5) continue; // Less margin at bottom
                     
                     ctx.font = 'bold ' + fontSize + 'px ' + styling.creditsFont;
                     
