@@ -665,6 +665,12 @@
 						
                         tempCtx.drawImage(img, 0, 0);
 
+						} catch (error) {
+							console.error('Error setting up canvas:', error);
+							resolve();
+							return;
+						}
+
                         for (let y = 0; y <= img.height - targetH; y += step) {
                             try {
                                 const sampleY = y + Math.floor(targetH * 0.25);
