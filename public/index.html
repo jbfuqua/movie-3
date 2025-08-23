@@ -1585,6 +1585,48 @@
 				this.setLoadingState(false);
 			  }
 			}
+			
+			// --- add this inside class EnhancedPosterAI ---
+
+			/** Wrapper so handleGeneration() doesn't break */
+			async generateConcept() {
+			  // keep progress UI consistent with generateMovieConcept
+			  return await this.generateMovieConcept();
+			}
+
+			/** Compose a concise visual brief for the image API from the concept + filters */
+			buildVisualIntent(concept) {
+			  // pull active filters from the UI (already in DOM)
+			  const genrePref = this.elements.genreFilter?.value || 'any';
+			  const eraPref   = this.elements.eraFilter?.value || concept.decade || 'any';
+			  const artStyle  = this.elements.artStyleFilter?.value || 'authentic';
+
+			  // construct a compact description the /api/generate-image endpoint can use
+			  // (string is fine because your IMAGE API treats "visualElements" as a prompt-like field)
+			  const bits = [
+				concept?.title ? `Title: ${concept.title}` : null,
+				concept?.genre ? `Genre: ${concept.genre}` : null,
+				concept?.decade ? `Era: ${concept.decade}` : null,
+				concept?.tagline ? `Tagline: ${concept.tagline}` : null,
+				concept?.synopsis ? `Synopsis: ${concept.synopsis}` : null,
+				`Target Era Preference: ${eraPref}`,
+				`Genre Preference: ${genrePref}`,
+				`Art Style: ${artStyle} (poster, cinematic, high detail)`,
+				`Framing: portrait, center-focused subject, movie poster composition`,
+				`Texture: print grain / paper fiber if era<2000, clean modern otherwise`,
+				`No text in image (titles/credits will be drawn later)`
+			  ].filter(Boolean);
+
+			  return bits.join('\n');
+			}
+
+			/** Clear any visible error (handleGeneration calls clearError?.()) */
+			clearError() {
+			  this.hideError?.();
+			  // also reset status if needed
+			  this.updateStatus?.('ready', 'Ready');
+			}
+
 
         }
 
