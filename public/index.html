@@ -276,6 +276,41 @@
 
     <canvas id="poster-canvas" class="hidden"></canvas>
 
+	<script>
+	// Normalize any image string into a safe URL for <img>.src (prevents blockers and canvas taint)
+	function normalizeToBlobUrl(maybeBase64OrUrl) {
+	  try {
+		let s = String(maybeBase64OrUrl || '');
+
+		// Already safe?
+		if (s.startsWith('blob:') || s.startsWith('data:')) return s;
+
+		// Raw base64 without prefix? Wrap it
+		if (!/^https?:\/\//i.test(s) && !s.startsWith('data:')) {
+		  s = 'data:image/png;base64,' + s;
+		}
+
+		// If still http(s), leave it (server handles CORS/base64); otherwise convert data: → blob:
+		if (!s.startsWith('data:')) return s;
+
+		const comma = s.indexOf(',');
+		const header = s.slice(0, comma);
+		const b64 = s.slice(comma + 1);
+		const mimeMatch = /data:(.*?);base64/i.exec(header);
+		const mime = (mimeMatch && mimeMatch[1]) || 'image/png';
+
+		const bin = atob(b64);
+		const bytes = new Uint8Array(bin.length);
+		for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+		return URL.createObjectURL(new Blob([bytes], { type: mime }));
+	  } catch (e) {
+		console.warn('normalizeToBlobUrl failed:', e);
+		return maybeBase64OrUrl;
+	  }
+	}
+	</script>
+
     <script>
         class EnhancedPosterAI {
             constructor() {
@@ -643,133 +678,57 @@
                 return stylings[decade] || stylings['1980s'];
             }
 
-            smartCropToInstagramRatio(imageUrl) {
-                
-  const self = this;
-  return new Promise((resolve) => {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onerror = () => { console.warn('Image load failed:', imageUrl); resolve(); };
+			smartCropToInstagramRatio(imageUrl) {
+			  const self = this;
+			  return new Promise((resolve) => {
+				try {
+				  const img = new Image();
+				  img.crossOrigin = 'anonymous';
+				  img.onerror = () => { console.warn('Image load failed:', imageUrl); resolve(); };
 
-      img.onload = function () {
-        const canvas = self.elements.canvas;
-        const ctx = self.ctx;
+				  img.onload = function () {
+					const canvas = self.elements.canvas;
+					const ctx = self.ctx;
 
-        const isMobile = window.innerWidth <= 768;
-        const targetW = isMobile ? 512 : 1024;
+					const isMobile = window.innerWidth <= 768;
+					const targetW = isMobile ? 512 : 1024;
 
-        // 4:5 portrait default; set self.aspectRatio = 1.5 for 2:3 if desired
-        const aspect = (typeof self.aspectRatio === 'number' && self.aspectRatio > 0) ? self.aspectRatio : 1.25;
-        const targetH = Math.floor(targetW * aspect);
+					// Default IG portrait 4:5; set this.aspectRatio = 1.5 for 2:3 if you prefer
+					const aspect = (typeof self.aspectRatio === 'number' && self.aspectRatio > 0) ? self.aspectRatio : 1.25;
+					const targetH = Math.floor(targetW * aspect);
 
-        // Prepare destination; fill background to avoid any transparent band
-        canvas.width = targetW;
-        canvas.height = targetH;
-        ctx.clearRect(0, 0, targetW, targetH);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, targetW, targetH);
+					// Prepare destination; fill background to avoid any transparent band
+					canvas.width = targetW;
+					canvas.height = targetH;
+					ctx.clearRect(0, 0, targetW, targetH);
+					ctx.fillStyle = '#000';
+					ctx.fillRect(0, 0, targetW, targetH);
 
-        // High-quality resampling
-        if (ctx.imageSmoothingEnabled !== undefined) {
-          ctx.imageSmoothingEnabled = true;
-          if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
-        }
+					// High-quality resampling
+					if (ctx.imageSmoothingEnabled !== undefined) {
+					  ctx.imageSmoothingEnabled = true;
+					  if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+					}
 
-        // Cover fit + centered crop
-        const scale = Math.max(targetW / img.width, targetH / img.height);
-        const sWidth  = targetW / scale;
-        const sHeight = targetH / scale;
-        const sx = Math.max(0, (img.width  - sWidth)  / 2);
-        const sy = Math.max(0, (img.height - sHeight) / 2);
+					// Cover fit + centered crop (like CSS object-fit: cover)
+					const scale = Math.max(targetW / img.width, targetH / img.height);
+					const sWidth  = targetW / scale;
+					const sHeight = targetH / scale;
+					const sx = Math.max(0, (img.width  - sWidth)  / 2);
+					const sy = Math.max(0, (img.height - sHeight) / 2);
 
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetW, targetH);
-        resolve();
-      };
+					ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetW, targetH);
+					resolve();
+				  };
 
-      // Normalize to blob:/data:
-      const normalized = (typeof normalizeToBlobUrl === 'function') ? normalizeToBlobUrl(imageUrl) : imageUrl;
-      img.src = normalized;
-    } catch (_) {
-      resolve();
-    }
-  });
+				  // Normalize to blob:/data:
+				  img.src = normalizeToBlobUrl(imageUrl);
+				} catch (_) {
+				  resolve();
+				}
+			  });
+			}
 
-							}
-							
-							// Apply DPI scaling if needed
-							const dpr = window.devicePixelRatio || 1;
-							if (dpr > 1 && this.originalCanvasSize) {
-								self.elements.canvas.width = targetW * dpr;
-								self.elements.canvas.height = targetH * dpr;
-								self.ctx.scale(dpr, dpr);
-							} else {
-								self.elements.canvas.width = targetW;
-								self.elements.canvas.height = targetH;
-							}
-						
-                        tempCtx.drawImage(img, 0, 0);
-
-						} catch (error) {
-							console.error('Error setting up canvas:', error);
-							resolve();
-							return;
-						}
-
-                        for (let y = 0; y <= img.height - targetH; y += step) {
-                            try {
-                                const sampleY = y + Math.floor(targetH * 0.25);
-                                const sampleH = Math.floor(targetH * 0.5);
-                                const imageData = tempCtx.getImageData(0, sampleY, targetW, sampleH);
-                                const data = imageData.data;
-                                
-                                let sum = 0;
-                                let sum2 = 0;
-                                let count = 0;
-                                const sampleRate = isMobile ? 32 : 16;
-                                
-                                for (let i = 0; i < data.length; i += sampleRate) {
-                                    const r = data[i];
-                                    const g = data[i + 1];
-                                    const b = data[i + 2];
-                                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-                                    sum += brightness;
-                                    sum2 += brightness * brightness;
-                                    count++;
-                                }
-                                
-                                const mean = sum / count;
-                                const variance = sum2 / count - mean * mean;
-                                
-                                if (variance > bestCrop.score) {
-                                    bestCrop = { y: y, score: variance };
-                                }
-                            } catch (error) {
-                                continue;
-                            }
-                        }
-
-                        self.elements.canvas.width = targetW;
-                        self.elements.canvas.height = targetH;
-                        self.ctx.clearRect(0, 0, targetW, targetH);
-                        self.ctx.drawImage(img, 0, bestCrop.y, targetW, targetH, 0, 0, targetW, targetH);
-                        
-                        self.ctx.imageSmoothingEnabled = true;
-                        if (self.ctx.imageSmoothingQuality) {
-                            self.ctx.imageSmoothingQuality = 'high';
-                        }
-                        
-                        tempCanvas.width = 0;
-                        tempCanvas.height = 0;
-                        
-                        resolve();
-                    };
-                    img.onerror = function() {
-                        resolve();
-                    };
-                    img.src = imageUrl;
-                });
-            }
 
             addGradientOverlays() {
                 const canvas = this.elements.canvas;
@@ -958,186 +917,115 @@
 			}
 
 			async renderTitleAndCredits(concept) {
-				console.log('Starting text rendering...');
-				
-				// Add a timeout to prevent infinite hanging
-				return new Promise((resolve) => {
-					const timeout = setTimeout(() => {
-						console.error('Text rendering timed out after 10 seconds');
-						resolve();
-					}, 10000);
-					
-					try {
-						const canvas = this.elements.canvas;
-						const ctx = this.ctx;
-						
-						if (!canvas || !ctx || !concept) {
-							console.error('Missing canvas, context, or concept');
-							clearTimeout(timeout);
-							resolve();
-							return;
-						}
-						
-						const w = canvas.width;
-						const h = canvas.height;
-						
-						if (w <= 0 || h <= 0) {
-							console.error('Invalid canvas dimensions:', w, h);
-							clearTimeout(timeout);
-							resolve();
-							return;
-						}
+			  const canvas = this.elements.canvas;
+			  const ctx = this.ctx;
+			  const w = canvas.width;
+			  const h = canvas.height;
 
-						ctx.textAlign = 'center';
-						ctx.textBaseline = 'middle';
+			  const fontFamily = this.styling.titleFont;
+			  const maxTextWidth = w * 0.9;
 
-						const styling = this.getEraSpecificStyling(concept.decade, concept.genre);
-						const safeMargin = w * 0.06;
-						const maxTextWidth = w - (safeMargin * 2);
+			  // --- Title Rendering ---
+			  ctx.textBaseline = 'top';
+			  ctx.textAlign = 'center';
 
-						// Render title safely
-						this.renderTitleSafely(concept, ctx, w, h, styling, maxTextWidth);
-						
-						// Render tagline
-						if (concept.tagline) {
-							const tagline = concept.tagline;
-							let fontSize = Math.max(16, Math.floor(w / 35));
-							ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
-							
-							// Safety limit for tagline sizing
-							let iterations = 0;
-							while (ctx.measureText(tagline).width > maxTextWidth && fontSize > 12 && iterations < 10) {
-								fontSize -= 1;
-								ctx.font = 'italic ' + fontSize + 'px ' + styling.taglineFont;
-								iterations++;
-							}
-							
-							const taglineLines = this.wrapText(ctx, tagline, w / 2, h * 0.24, maxTextWidth, fontSize * 1.3);
-							
-							ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-							ctx.shadowBlur = fontSize / 3;
-							ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-							ctx.lineWidth = 2;
-							ctx.fillStyle = styling.taglineColor;
-							
-							for (let i = 0; i < Math.min(taglineLines.length, 2); i++) { // Limit to 2 lines
-								const line = taglineLines[i];
-								const yOffset = (i - (Math.min(taglineLines.length, 2) - 1) / 2) * fontSize * 1.3;
-								const yPos = h * 0.24 + yOffset;
-								ctx.strokeText(line, w / 2, yPos);
-								ctx.fillText(line, w / 2, yPos);
-							}
-							ctx.shadowBlur = 0;
-						}
+			  const titleText = concept.title ? concept.title.toUpperCase() : 'UNTITLED';
+			  let fontSize = Math.min(Math.floor(w / 8), 120);
+			  ctx.font = `bold ${fontSize}px ${fontFamily}`;
 
-						// Render credits (with cast + checkerboarding)
-let creditsStartY // removed stray assignment
+			  // Shrink until it fits within max width
+			  while (ctx.measureText(titleText).width > maxTextWidth && fontSize > 20) {
+				fontSize -= 2;
+				ctx.font = `bold ${fontSize}px ${fontFamily}`;
+			  }
 
-// --- Build cast credits with fallback and checkerboarding ---
-let castNames = [];
-if (Array.isArray(concept.cast) && concept.cast.length) {
-  castNames = concept.cast.slice(0, 6).map(n => String(n).trim());
-} else {
-  const firstNames = ["Alex","Jordan","Taylor","Morgan","Riley","Casey","Jamie","Sam","Cameron","Dana"];
-  const lastNames  = ["Reeves","Winters","Stone","Black","Knight","Frost","Hale","Rivera","Cole","Summers"];
-  for (let i = 0; i < 4; i++) {
-    const fn = firstNames[Math.floor(Math.random()*firstNames.length)];
-    const ln = lastNames[Math.floor(Math.random()*lastNames.length)];
-    castNames.push((fn + ' ' + ln).toUpperCase());
-  }
-}
+			  // Draw title with subtle shadow/glow
+			  ctx.fillStyle = this.styling.titleColor || 'white';
+			  ctx.shadowColor = this.styling.titleGlow || 'rgba(0,0,0,0.7)';
+			  ctx.shadowBlur = fontSize / 6;
+			  ctx.fillText(titleText, w / 2, h * 0.10);
+			  ctx.shadowBlur = 0;
 
-const creditsLines = [];
-castNames.forEach((name, i) => {
-  creditsLines.push({ text: name, type: 'cast', align: (i % 2 === 0) ? 'left' : 'right' });
-});
+			  // --- Credits (checkerboard cast + centered metadata) ---
+			  let creditsStartY = Math.floor(h * 0.80);
 
-if (concept.director) {
-  creditsLines.push({ text: ('DIRECTED BY ' + String(concept.director).toUpperCase()), type: 'director', align: 'center' });
-}
-creditsLines.push({ text: 'AN ABNORMAL STUDIOS FILM', type: 'studio', align: 'center' });
+			  // Cast fallback
+			  let castNames = [];
+			  if (Array.isArray(concept.cast) && concept.cast.length) {
+				castNames = concept.cast.slice(0, 6).map(n => String(n).trim());
+			  } else {
+				const firstNames = ["Alex","Jordan","Taylor","Morgan","Riley","Casey","Jamie","Sam","Cameron","Dana"];
+				const lastNames  = ["Reeves","Winters","Stone","Black","Knight","Frost","Hale","Rivera","Cole","Summers"];
+				for (let i = 0; i < 4; i++) {
+				  const fn = firstNames[Math.floor(Math.random()*firstNames.length)];
+				  const ln = lastNames[Math.floor(Math.random()*lastNames.length)];
+				  castNames.push((fn + ' ' + ln).toUpperCase());
+				}
+			  }
 
-// Inline runtime pick (avoid duplicate declarations)
-creditsLines.push({ text: ('NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES','124 MINUTES','138 MINUTES'][Math.floor(Math.random()*6)]), type: 'rating', align: 'center' });
+			  // Build lines
+			  const creditsLines = [];
+			  castNames.forEach((name, i) => {
+				creditsLines.push({ text: name, type: 'cast', align: (i % 2 === 0) ? 'left' : 'right' });
+			  });
+			  if (concept.director) {
+				creditsLines.push({ text: ('DIRECTED BY ' + String(concept.director).toUpperCase()), type: 'director', align: 'center' });
+			  }
+			  creditsLines.push({ text: 'AN ABNORMAL STUDIOS FILM', type: 'studio', align: 'center' });
+			  creditsLines.push({
+				text: 'NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES','124 MINUTES','138 MINUTES'][Math.floor(Math.random()*6)],
+				type: 'rating',
+				align: 'center'
+			  });
+			  creditsLines.push({
+				text: '© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS',
+				type: 'copyright',
+				align: 'center'
+			  });
 
-creditsLines.push({ text: ('© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS'), type: 'copyright', align: 'center' });
+			  const creditSizes = {
+				cast: Math.max(14, Math.floor(w / 52)),
+				director: Math.max(12, Math.floor(w / 55)),
+				studio: Math.max(14, Math.floor(w / 50)),
+				rating: Math.max(11, Math.floor(w / 60)),
+				copyright: Math.max(9, Math.floor(w / 65))
+			  };
 
-const creditSizes = {
-  cast: Math.max(14, Math.floor(w / 52)),
-  director: Math.max(12, Math.floor(w / 55)),
-  studio: Math.max(14, Math.floor(w / 50)),
-  rating: Math.max(11, Math.floor(w / 60)),
-  copyright: Math.max(9, Math.floor(w / 65))
-};
+			  let currentY = creditsStartY;
+			  const maxY = h - Math.floor(h * 0.04); // bottom margin
+			  const lineLimit = 10;
 
-let currentY = creditsStartY;
-ctx.textAlign = 'center';
+			  for (let i = 0, drawn = 0; i < creditsLines.length && drawn < lineLimit; i++) {
+				const credit = creditsLines[i];
+				if (!credit.text) continue;
 
-for (let i = 0; i < creditsLines.length; i++) {
-  const credit = creditsLines[i];
-  if (!credit.text) continue;
+				const size = creditSizes[credit.type] || Math.max(12, Math.floor(w / 55));
+				const lineHeight = Math.floor(size * 1.35);
 
-  const fontSize = creditSizes[credit.type] || creditSizes.rating;
-  const lineHeight = fontSize * 1.4;
+				if (currentY + size > maxY) break;
 
-  if (currentY + fontSize > h - 5) continue;
+				ctx.font = `bold ${size}px ${fontFamily}`;
+				ctx.fillStyle = 'white';
+				ctx.textBaseline = 'top';
 
-  ctx.font = 'bold ' + fontSize + 'px ' + styling.creditsFont;
+				if (credit.align === 'left') {
+				  ctx.textAlign = 'left';
+				  ctx.fillText(credit.text, Math.floor(w * 0.10), currentY);
+				} else if (credit.align === 'right') {
+				  ctx.textAlign = 'right';
+				  ctx.fillText(credit.text, Math.floor(w * 0.90), currentY);
+				} else {
+				  ctx.textAlign = 'center';
+				  ctx.fillText(credit.text, Math.floor(w / 2), currentY);
+				}
 
-  // Optional subtle shadow for readability
-  if (credit.type === 'studio') {
-    ctx.shadowColor = styling.titleGlow;
-    ctx.shadowBlur = fontSize / 4;
-  } else {
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = fontSize / 6;
-  }
+				currentY += lineHeight;
+				drawn++;
+			  }
 
-  let displayLine = credit.text;
-  let truncateCount = 0;
-  while (ctx.measureText(displayLine).width > maxTextWidth &&
-         displayLine.length > 10 &&
-         truncateCount < 20) {
-    displayLine = displayLine.substring(0, displayLine.length - 4) + '...';
-    truncateCount++;
-  }
-
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-  ctx.lineWidth = 2;
-
-  // Align and draw
-  if (credit.align === 'left') {
-    ctx.textAlign = 'left';
-    ctx.strokeText(displayLine, w * 0.1, currentY);
-    ctx.fillStyle = styling.creditsColor;
-    ctx.fillText(displayLine, w * 0.1, currentY);
-  } else if (credit.align === 'right') {
-    ctx.textAlign = 'right';
-    ctx.strokeText(displayLine, w * 0.9, currentY);
-    ctx.fillStyle = styling.creditsColor;
-    ctx.fillText(displayLine, w * 0.9, currentY);
-  } else {
-    ctx.textAlign = 'center';
-    ctx.strokeText(displayLine, w / 2, currentY);
-    ctx.fillStyle = styling.creditsColor;
-    ctx.fillText(displayLine, w / 2, currentY);
-  }
-
-  currentY += lineHeight;
-  ctx.shadowBlur = 0;
-}
-
-console.log('Text rendering completed');
-						clearTimeout(timeout);
-						resolve();
-						
-					} catch (error) {
-						console.error('Error in renderTitleAndCredits:', error);
-						clearTimeout(timeout);
-						resolve();
-					}
-				});
+			  console.log('Text rendering completed');
 			}
+
 
 			renderTitleSafely(concept, ctx, w, h, styling, maxTextWidth) {
 				const title = (concept.title || '').toUpperCase();
@@ -1648,63 +1536,56 @@ console.log('Text rendering completed');
                 }
             }
 
-            async handleGeneration() {
-                console.log('handleGeneration called');
+			async handleGeneration() {
+			  try {
+				this.clearError?.();
+				this.setLoadingState(true);
 
-				if (this.isGenerating) {
-					console.log('Generation already in progress, aborting');
-					return;
+				// Concept
+				this.updateProgress('concept', 10);
+				const concept = await this.generateConcept();        // wrapper that calls generateMovieConcept()
+				if (!concept) { this.setLoadingState(false); return; }
+				this.currentConcept = concept;
+				this.updateInfo?.(concept);
+
+				// Image
+				this.updateProgress('image', 40);
+				const baseImageUrl = await this.generateImage(this.buildVisualIntent(concept), concept);
+				if (!baseImageUrl) { this.setLoadingState(false); return; }
+
+				// Always normalize to a safe URL (blob:/data:) before drawing to canvas
+				const _safeForImg = normalizeToBlobUrl(baseImageUrl);
+
+				// Crop & compose
+				this.updateProgress('text', 70);
+				await this.smartCropToInstagramRatio(_safeForImg);   // uses cover-fit, fills bg
+				this.addGradientOverlays?.();
+				await this.renderTitleAndCredits(concept);
+
+				// Optional soundtrack (non-fatal if fails)
+				if (typeof this.generateSong === 'function') {
+				  this.updateProgress('song', 85);
+				  try { await this.generateSong(concept); } catch (_) {}
 				}
-                 
-                this.hideError();
-                this.setLoadingState(true);
-                this.updateInfo({ decade: '...', genre: '...', title: '...', tagline: '...', synopsis: '...' });
 
-                try {
-                    this.updateProgress('concept', 10);
-                    const concept = await this.generateMovieConcept();
-                    if (!concept) {
-                        this.setLoadingState(false);
-                        return;
-                    }
-                    
-                    concept.artStyle = this.elements.artStyleFilter.value;
-                    this.currentConcept = concept;
-                    this.updateInfo(concept);
+				// Finalize
+				this.updateProgress('complete', 100);
+				const finalImageUrl = this.elements.canvas.toDataURL('image/png');
+				this.elements.posterImage.src = normalizeToBlobUrl(finalImageUrl);
 
-                    this.updateProgress('image', 40);
-                    const baseImageUrl = await this.generateImage(concept.visual_elements, concept);
-                    if (!baseImageUrl) {
-                        this.setLoadingState(false);
-                        return;
-                    }
+				// Track recent
+				this.recentPosters = this.recentPosters || [];
+				this.recentPosters.unshift({ imageUrl: finalImageUrl, concept });
+				if (this.recentPosters.length > 12) this.recentPosters.pop();
 
-                    this.updateProgress('text', 70);
-                    await this.smartCropToInstagramRatio(baseImageUrl);
-                    this.addGradientOverlays();
-                    await this.renderTitleAndCredits(concept);
-                    
-                    this.updateProgress('song', 85);
-                    
-                    this.updateProgress('complete', 100);
-                    const finalImageUrl = this.elements.canvas.toDataURL('image/png');
-                    this.elements.posterImage.src = finalImageUrl;
-                    
-                    this.addToRecent(finalImageUrl, concept);
-                    
-                    this.generationCount++;
-                    this.elements.generationCounter.textContent = this.generationCount + ' poster' + (this.generationCount !== 1 ? 's' : '') + ' created';
-                    
-                } catch (error) {
-                    console.error("Error in generation process:", error);
-                    this.showError("Failed to process the poster. Please try again.");
-                } finally {
-                    this.setLoadingState(false);
-                    if (this.autoGenerate) {
-                        this.startAutoTimer();
-                    }
-                }
-            }
+			  } catch (error) {
+				console.error('Error in generation process:', error);
+				this.showError?.('Error in generation process: ' + (error?.message || error));
+			  } finally {
+				this.setLoadingState(false);
+			  }
+			}
+
         }
 
         document.addEventListener('DOMContentLoaded', function() {
