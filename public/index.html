@@ -1618,30 +1618,48 @@
                 }
             }
 
-					const baseImageUrl = await this.generateImage(this.buildVisualIntent(concept), concept);
-					if (!baseImageUrl) {
-						this.setLoadingState(false);
-						return;
-					}
+            async handleGeneration() {
+                console.log('handleGeneration called');
 
-					this.updateProgress('text', 70);
+				if (this.isGenerating) {
+					console.log('Generation already in progress, aborting');
+					return;
+				}
+                 
+                this.hideError();
+                this.setLoadingState(true);
+                this.updateInfo({ decade: '...', genre: '...', title: '...', tagline: '...', synopsis: '...' });
 
-					// normalize base64/url into a safe data: URI
-					const _safeBase = (
-					  typeof baseImageUrl === 'string' && baseImageUrl.startsWith('data:')
-					) ? baseImageUrl
-					  : (/^https?:\/\//.test(baseImageUrl) ? baseImageUrl
-					  : `data:image/png;base64,${baseImageUrl}`);
+                try {
+                    this.updateProgress('concept', 10);
+                    const concept = await this.generateMovieConcept();
+                    if (!concept) {
+                        this.setLoadingState(false);
+                        return;
+                    }
+                    
+                    concept.artStyle = this.elements.artStyleFilter.value;
+                    this.currentConcept = concept;
+                    this.updateInfo(concept);
 
-					await this.smartCropToInstagramRatio(_safeBase);
-					this.addGradientOverlays();
-					await this.renderTitleAndCredits(concept);
+                    this.updateProgress('image', 40);
+                    const baseImageUrl = await this.generateImage(this.buildVisualIntent(concept), concept);
+                    if (!baseImageUrl) {
+                        this.setLoadingState(false);
+                        return;
+                    }
 
-					this.updateProgress('song', 85);
-					this.updateProgress('complete', 100);
-					const finalImageUrl = this.elements.canvas.toDataURL('image/png');
-					this.elements.posterImage.src = finalImageUrl;
-
+                    this.updateProgress('text', 70);
+                    const _safeBase = (typeof baseImageUrl === 'string' && baseImageUrl.startsWith('data:')) ? baseImageUrl : (/^https?:\/\//.test(baseImageUrl) ? baseImageUrl : `data:image/png;base64,${baseImageUrl}`);
+                    await this.smartCropToInstagramRatio(_safeBase);
+                    this.addGradientOverlays();
+                    await this.renderTitleAndCredits(concept);
+                    
+                    this.updateProgress('song', 85);
+                    
+                    this.updateProgress('complete', 100);
+                    const finalImageUrl = this.elements.canvas.toDataURL('image/png');
+                    this.elements.posterImage.src = finalImageUrl;
                     
                     this.addToRecent(finalImageUrl, concept);
                     
