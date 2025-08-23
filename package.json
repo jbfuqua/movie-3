@@ -4,9 +4,9 @@
   "description": "AI-powered movie poster generator deployed on Vercel",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev",
-    "start": "next start",
-    "build": "next build"
+    "dev": "dev",
+    "start": "start",
+    "build": "build"
   },
   "keywords": [
     "ai",
