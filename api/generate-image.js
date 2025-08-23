@@ -1,73 +1,89 @@
-// api/generate-image.js - Vercel Serverless Function
+// api/generate-image.js - Vercel Serverless Function (era/genre fidelity)
 export default async function handler(req, res) {
-    // Enable CORS
+    // CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ success: false, error: 'Method not allowed' });
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
     try {
-        const { visualElements = '', concept = {} } = req.body;
-        
-        // Enhanced prompt construction for DALL-E 3 with safety considerations
-        function createOptimizedPrompt(concept, visualElements) {
-            const genre = (concept.genre || '').toLowerCase();
-            const decade = concept.decade || '1980s';
-            const artStyle = concept.artStyle || 'authentic';
-            
-            // Era-specific visual cues (concise but effective)
-            const eraCues = {
-                '1950s': 'vintage film grain, hand-painted poster art, atomic age design, retro illustration',
-                '1960s': 'retro color palettes, halftone poster texture, mod design influences, pop art style',
-                '1970s': 'airbrushed illustration style, earth tone colors, vintage movie poster aesthetic',
-                '1980s': 'high contrast lighting, neon color accents, retro-futuristic design elements',
-                '1990s': 'photographic movie poster style, professional studio photography',
-                '2000s': 'digital art style, metallic textures, early 2000s movie poster aesthetic',
-                '2010s': 'minimalist poster design, clean composition, modern movie poster style',
-                '2020s': 'contemporary movie poster photography, premium cinematography style'
-            };
+        const { visualElements = '', concept = {} } = req.body || {};
 
-            // Art style approach (safety-conscious)
-            const styleApproach = {
-                'painted': 'hand-painted movie poster illustration, artistic poster design',
-                'b-movie': 'vintage B-movie poster art style, retro movie advertisement design',
-                'photo': 'cinematic portrait photography, professional movie poster photography',
-                'authentic': 'authentic movie poster design'
-            };
+        // Era look templates
+        const eraLook = {
+            '1950s': { stock: 'vintage film grain, hand-painted poster rendering', lens: '50mm normal perspective', paletteHint: 'muted primaries, cream paper tone' },
+            '1960s': { stock: 'retro halftone texture, mod color blocking', lens: '35mm slightly wide', paletteHint: 'pop primaries with off-white' },
+            '1970s': { stock: 'airbrushed illustration, earthy low-saturation tones', lens: '85mm portrait compression', paletteHint: 'ochre, burnt orange, olive' },
+            '1980s': { stock: 'high-contrast chrome sheen, subtle bloom', lens: '85mm portrait or 35mm neon street', paletteHint: 'teal, magenta, neon accents' },
+            '1990s': { stock: 'studio portrait photography, slight grain', lens: '70–200mm telephoto poster style', paletteHint: 'neutral mids, controlled highlights' },
+            '2000s': { stock: 'digital composite sheen, clean gradients', lens: '35mm–50mm', paletteHint: 'cool metallics + skin tones' },
+            '2010s': { stock: 'minimalist, clean negative space', lens: '50mm, shallow depth of field', paletteHint: 'subtle teal/orange, soft blacks' },
+            '2020s': { stock: 'contemporary cinematic HDR, refined grading', lens: '35mm, controlled DOF', paletteHint: 'true blacks, tasteful limited palette' }
+        };
 
-            // Safety-conscious genre mood (avoid triggering words)
-            const genreMood = genre.includes('horror') ? 'mysterious atmosphere, dramatic lighting, suspenseful mood' :
-                             genre.includes('sci-fi') ? 'futuristic setting, technological elements, otherworldly atmosphere' :
-                             'dramatic cinematic atmosphere, movie poster mood';
-
-            // Clean and sanitize visual elements to avoid safety triggers
-            const cleanVisualElements = sanitizeVisualElements(visualElements || '', genre);
-
-            // Construct optimized prompt with safety measures
-            const medium = styleApproach[artStyle] || styleApproach['authentic'];
-            const eraCue = eraCues[decade] || eraCues['2020s'];
-            
-            return `Professional movie poster design. ${medium}. ${genreMood}. ${cleanVisualElements}. ${eraCue}. Single character portrait or group composition, movie poster layout, cinematic lighting, no text, no letters, no logos, clean professional movie poster style suitable for general audiences.`;
+        function sanitizeVisualElements(text) {
+            if (!text) return '';
+            const banned = [
+                'gore','gory','blood','bloody','graphic injury','dismemberment',
+                'decapitation','suicide','self-harm','sexual','nudity','torture','kill','murder',
+                'gun','rifle','pistol','knife','weapon'
+            ];
+            let t = ` ${text} `.toLowerCase();
+            banned.forEach(w => { t = t.replace(new RegExp(`\\b${w}\\b`, 'gi'), ''); });
+            return t.replace(/\s+/g, ' ').trim().slice(0, 280);
         }
 
-        // Ultra-safe fallback prompt for when main prompt is rejected
+        function toPaletteText(palette, fallback) {
+            if (Array.isArray(palette) && palette.length) {
+                return `color palette ${palette.join(', ')}`;
+            }
+            return fallback || '';
+        }
+
+        function createOptimizedPrompt(concept, visualElements) {
+            const v = concept.visual_spec || {};
+            const decade = concept.decade || '1980s';
+            const look = eraLook[decade] || eraLook['2020s'];
+
+            const palette = toPaletteText(v.palette, look.paletteHint);
+            const camera = v.camera
+                ? `${v.camera.shot || 'portrait'} shot, ${v.camera.lens || look.lens}, ${v.camera.depth_of_field || 'shallow'} depth of field`
+                : look.lens;
+
+            const lighting = v.lighting || 'cinematic key light with controlled contrast';
+            const composition = v.composition || 'balanced poster composition with clear subject focus';
+            const environment = v.environment || 'cinematic environment';
+            const wardrobe = v.wardrobe_props || 'era-accurate wardrobe and props';
+            const motifs = Array.isArray(v.motifs) && v.motifs.length ? `iconic motifs: ${v.motifs.slice(0,3).join(', ')}` : '';
+            const cleanedElements = sanitizeVisualElements(visualElements || (Array.isArray(v.keywords) ? v.keywords.join(', ') : ''));
+
+            const genreDesc = (concept.genre || 'cinematic').toLowerCase().includes('horror')
+                ? 'mysterious, suspenseful atmosphere (PG-13)'
+                : ((concept.genre || '').toLowerCase().includes('sci') ? 'futuristic, otherworldly atmosphere' : 'dramatic cinematic atmosphere');
+
+            // Final prompt
+            return [
+                `Professional ${concept.genre || 'cinematic'} movie poster in the ${decade} style.`,
+                look.stock,
+                camera + ', ' + lighting,
+                composition,
+                environment + ', ' + wardrobe,
+                palette,
+                motifs,
+                cleanedElements ? `additional visual elements: ${cleanedElements}` : '',
+                genreDesc,
+                'no text, no letters, no logos, clean professional movie poster style suitable for general audiences.'
+            ].filter(Boolean).join(' ');
+        }
+
         function createUltraSafePrompt(concept) {
             const decade = concept.decade || '1980s';
-            const genre = (concept.genre || '').toLowerCase();
-            
-            // Ultra-safe era styling
             const safeEraStyles = {
                 '1950s': 'vintage 1950s movie poster art style, retro illustration',
-                '1960s': 'colorful 1960s poster design, mod art style', 
+                '1960s': 'colorful 1960s poster design, mod art style',
                 '1970s': 'classic 1970s movie poster, vintage design',
                 '1980s': 'bright 1980s movie poster style, retro design',
                 '1990s': 'professional 1990s movie photography style',
@@ -75,78 +91,15 @@ export default async function handler(req, res) {
                 '2010s': 'modern movie poster photography',
                 '2020s': 'contemporary movie poster design'
             };
-            
-            // Generic safe descriptions
+            const genre = (concept.genre || '').toLowerCase();
             const safeGenreDesc = genre.includes('horror') ? 'mysterious adventure' :
-                                 genre.includes('sci-fi') ? 'futuristic adventure' :
-                                 'dramatic adventure';
-            
+                                  genre.includes('sci') ? 'futuristic adventure' : 'dramatic adventure';
             return `Professional movie poster design featuring a person in ${safeGenreDesc} setting. ${safeEraStyles[decade] || safeEraStyles['2020s']}. Cinematic composition, dramatic lighting, movie poster layout, no text, suitable for all audiences, high quality movie poster art.`;
         }
 
-        // Function to sanitize visual elements and remove potential safety triggers
-        function sanitizeVisualElements(visualElements, genre) {
-            // Common words that trigger DALL-E safety filters
-            const problematicWords = [
-                'violence', 'violent', 'blood', 'gore', 'death', 'dying', 'kill', 'murder', 'weapon', 'knife', 'gun',
-                'terror', 'terrifying', 'nightmare', 'demon', 'devil', 'hell', 'evil', 'sinister', 'menacing',
-                'torture', 'pain', 'suffering', 'scream', 'fear', 'afraid', 'panic', 'dread',
-                'monster', 'creature', 'beast', 'zombie', 'ghost', 'spirit', 'haunted', 'possessed',
-                'dark', 'darkness', 'shadow', 'lurking', 'stalking', 'threatening', 'dangerous'
-            ];
-            
-            // Safe replacements that maintain cinematic mood
-            const safeReplacements = {
-                'violence': 'dramatic action',
-                'violent': 'intense',
-                'blood': 'red lighting',
-                'death': 'dramatic scene',
-                'terror': 'suspense',
-                'terrifying': 'mysterious',
-                'nightmare': 'surreal scene',
-                'demon': 'mysterious figure',
-                'evil': 'mysterious',
-                'sinister': 'enigmatic',
-                'menacing': 'imposing',
-                'monster': 'mysterious being',
-                'creature': 'character',
-                'dark': 'moody lighting',
-                'darkness': 'dramatic lighting',
-                'shadow': 'silhouette',
-                'haunted': 'atmospheric',
-                'possessed': 'transformed',
-                'threatening': 'imposing',
-                'dangerous': 'intense'
-            };
-            
-            let cleaned = visualElements.toLowerCase();
-            
-            // Replace problematic words with safe alternatives
-            problematicWords.forEach(word => {
-                const replacement = safeReplacements[word] || 'dramatic';
-                const regex = new RegExp(`\\b${word}\\b`, 'gi');
-                cleaned = cleaned.replace(regex, replacement);
-            });
-            
-            // Add positive framing for horror/sci-fi
-            if (genre.includes('horror')) {
-                cleaned = `Cinematic movie poster featuring ${cleaned}, mysterious atmosphere, dramatic composition`;
-            } else if (genre.includes('sci-fi')) {
-                cleaned = `Futuristic movie poster showing ${cleaned}, science fiction setting, imaginative design`;
-            } else {
-                cleaned = `Movie poster depicting ${cleaned}, cinematic composition`;
-            }
-            
-            // Ensure it stays within length limits
-            return cleaned.slice(0, 150);
-        }
-
         const prompt = createOptimizedPrompt(concept, visualElements);
-        
-        console.log('Optimized prompt length:', prompt.length);
-        console.log('Sanitized prompt:', prompt);
 
-        // Try main prompt first
+        // Primary request
         let response = await fetch('https://api.openai.com/v1/images/generations', {
             method: 'POST',
             headers: {
@@ -155,100 +108,43 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
                 model: "dall-e-3",
-                prompt: prompt,
+                prompt,
                 n: 1,
-                size: "1024x1792",
-                quality: "hd",
-                style: "vivid"
+                size: "1024x1024" // keep existing behavior if present in your original
             })
         });
 
-        // If prompt rejected for safety, try ultra-safe fallback
         if (!response.ok) {
-            const errorData = await response.json();
-            
-            // Check if it's a safety policy violation
-            if (errorData.error?.message?.includes('safety') || errorData.error?.message?.includes('policy')) {
-                console.log('Main prompt rejected for safety, trying fallback...');
-                
-                // Ultra-safe fallback prompt
-                const fallbackPrompt = createUltraSafePrompt(concept);
-                console.log('Fallback prompt:', fallbackPrompt);
-                
-                response = await fetch('https://api.openai.com/v1/images/generations', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-                    },
-                    body: JSON.stringify({
-                        model: "dall-e-3",
-                        prompt: fallbackPrompt,
-                        n: 1,
-                        size: "1024x1792",
-                        quality: "hd",
-                        style: "vivid"
-                    })
-                });
-                
-                if (!response.ok) {
-                    const fallbackError = await response.json();
-                    throw new Error(`Both main and fallback prompts rejected: ${fallbackError.error?.message || 'Unknown error'}`);
-                }
-            } else {
-                throw new Error(`DALL-E 3 API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-            }
+            // Fallback to ultra-safe prompt
+            const fallbackPrompt = createUltraSafePrompt(concept);
+            response = await fetch('https://api.openai.com/v1/images/generations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: "dall-e-3",
+                    prompt: fallbackPrompt,
+                    n: 1,
+                    size: "1024x1024"
+                })
+            });
         }
 
-        const result = await response.json();
-        
-        if (result.data && result.data[0]) {
-            let base64Image = result.data[0].b64_json;
-            let originalUrl = result.data[0].url;
-            
-            // If we got URL instead of base64, fetch and convert
-            if (!base64Image && originalUrl) {
-                try {
-                    console.log('Converting image URL to base64...');
-                    const imageResponse = await fetch(originalUrl);
-                    if (!imageResponse.ok) {
-                        throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-                    }
-                    const imageBuffer = await imageResponse.arrayBuffer();
-                    const uint8Array = new Uint8Array(imageBuffer);
-                    base64Image = Buffer.from(uint8Array).toString('base64');
-                } catch (conversionError) {
-                    console.error('Error converting image to base64:', conversionError);
-                    // Fallback to URL
-                    res.status(200).json({ 
-                        success: true, 
-                        imageUrl: originalUrl,
-                        revisedPrompt: result.data[0].revised_prompt,
-                        note: 'Image conversion failed, returning original URL'
-                    });
-                    return;
-                }
-            }
-            
-            if (!base64Image) {
-                throw new Error("No image data returned from API");
-            }
-            
-            res.status(200).json({ 
-                success: true, 
-                imageUrl: `data:image/png;base64,${base64Image}`,
-                originalUrl: originalUrl,
-                revisedPrompt: result.data[0].revised_prompt 
-            });
-        } else {
-            throw new Error("Invalid image response from DALL-E 3 API");
+        if (!response.ok) {
+            const errText = await response.text().catch(()=>'');
+            console.error('OpenAI image gen error:', errText);
+            throw new Error(`Image generation failed: ${response.status}`);
         }
-        
+
+        const data = await response.json();
+        const imageUrl = data?.data?.[0]?.url || data?.data?.[0]?.b64_json || null;
+        if (!imageUrl) return res.status(500).json({ success: false, error: 'No image returned' });
+
+        return res.status(200).json({ success: true, imageUrl });
     } catch (error) {
         console.error('Error generating image:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message || 'Failed to generate image' 
-        });
+        return res.status(500).json({ success: false, error: error.message });
     }
 }

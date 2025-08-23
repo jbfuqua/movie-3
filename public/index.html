@@ -510,6 +510,10 @@
                     const result = JSON.parse(responseText);
                     
                     if (result.success && result.concept) {
+                        // Build distilled visual intent from the concept's visual_spec (non-UI change)
+                        const _vs = (result.concept && result.concept.visual_spec) ? result.concept.visual_spec : {};
+                        var _intent = [_vs.composition || '', _vs.lighting || '', _vs.environment || '', Array.isArray(_vs.motifs) ? _vs.motifs.slice(0,2).join(', ') : ''].filter(Boolean).join(', ');
+
                         console.log("Concept generated:", result.concept);
                         this.updateProgress('concept', 30);
                         return result.concept;
@@ -1621,7 +1625,7 @@
                     this.updateInfo(concept);
 
                     this.updateProgress('image', 40);
-                    const baseImageUrl = await this.generateImage(concept.visual_elements, concept);
+                    const baseImageUrl = await this.generateImage(_intent, concept.visual_elements, concept);
                     if (!baseImageUrl) {
                         this.setLoadingState(false);
                         return;
