@@ -79,6 +79,20 @@ export default async function handler(req, res) {
             ].filter(Boolean).join(' ');
         }
 
+        
+        async function urlToDataUrl(u) {
+            try {
+                const r = await fetch(u);
+                if (!r.ok) throw new Error('fetch image failed ' + r.status);
+                const buf = await r.arrayBuffer();
+                const b64 = Buffer.from(buf).toString('base64');
+                return `data:image/png;base64,${b64}`;
+            } catch (e) {
+                console.error('urlToDataUrl error:', e);
+                return null;
+            }
+        }
+
         function createUltraSafePrompt(concept) {
             const decade = concept.decade || '1980s';
             const safeEraStyles = {
