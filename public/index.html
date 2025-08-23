@@ -925,15 +925,18 @@
 			measureTextWithSpacing(ctx, text, spacing) {
 				if (!spacing || spacing === 0) return ctx.measureText(text).width;
 				
-				let width = 0;
+				let totalWidth = 0;
 				const spaceWidth = ctx.measureText('M').width * spacing;
+				
 				for (let i = 0; i < text.length; i++) {
-					width += ctx.measureText(text[i]).width;
-					if (i < text.length - 1) width += spaceWidth;
+					totalWidth += ctx.measureText(text[i]).width;
+					if (i < text.length - 1) {
+						totalWidth += spaceWidth;
+					}
 				}
-				return width;
+				
+				return totalWidth;
 			}
-
 			smartTitleWrap(title, maxWidth, ctx, spacing) {
 				const words = title.split(' ');
 				if (words.length === 1) return [title];
@@ -1005,15 +1008,24 @@
 					return;
 				}
 				
+				// Calculate total width including spacing
 				const totalWidth = this.measureTextWithSpacing(ctx, text, spacing);
+				
+				// Start from the left edge of centered text
 				let currentX = x - (totalWidth / 2);
 				const spaceWidth = ctx.measureText('M').width * spacing;
 				
 				for (let i = 0; i < text.length; i++) {
 					const char = text[i];
-					ctx.fillText(char, currentX, y);
-					currentX += ctx.measureText(char).width;
-					if (i < text.length - 1) currentX += spaceWidth;
+					const charWidth = ctx.measureText(char).width;
+					
+					// Center each character within its allocated space
+					ctx.fillText(char, currentX + (charWidth / 2), y);
+					currentX += charWidth;
+					
+					if (i < text.length - 1) {
+						currentX += spaceWidth;
+					}
 				}
 			}
 
@@ -1029,24 +1041,37 @@
 				
 				for (let i = 0; i < text.length; i++) {
 					const char = text[i];
-					ctx.strokeText(char, currentX, y);
-					currentX += ctx.measureText(char).width;
-					if (i < text.length - 1) currentX += spaceWidth;
+					const charWidth = ctx.measureText(char).width;
+					
+					ctx.strokeText(char, currentX + (charWidth / 2), y);
+					currentX += charWidth;
+					
+					if (i < text.length - 1) {
+						currentX += spaceWidth;
+					}
 				}
-			}			
+			}
 
-			// NEW: Enhanced credit rendering system
+			// IMPROVED: Better credit layout system
 			renderCreditsWithHierarchy(ctx, concept, canvas, styling) {
 				const w = canvas.width;
 				const h = canvas.height;
 				
-				// Credit sections with positioning
-				const creditSections = [
+				// Calculate available space for credits
+				const creditStartY = h * 0.72;
+				const creditEndY = h * 0.96;
+				const availableHeight = creditEndY - creditStartY;
+				
+				// Generate cast with fallback
+				const cast = (concept.cast && concept.cast.length) ? concept.cast.slice(0, 4) : this.generateFallbackCast().slice(0, 4);
+				
+				const sections = [
 					{
 						type: 'cast',
-						names: (concept.cast || this.generateFallbackCast()).slice(0, 6),
-						startY: h * 0.75,
-						layout: 'dynamic'
+						items: cast,
+						fontSize: Math.max(16, Math.floor(w / 45)),
+						spacing: 1.8,
+						weight: 'bold'
 					},
 					{
 						type: 'crew',
@@ -1054,175 +1079,124 @@
 							concept.director ? `DIRECTED BY ${concept.director.toUpperCase()}` : null,
 							'AN ABNORMAL STUDIOS FILM'
 						].filter(Boolean),
-						startY: h * 0.88,
-						layout: 'centered'
+						fontSize: Math.max(14, Math.floor(w / 50)),
+						spacing: 1.4,
+						weight: 'bold'
 					},
 					{
-						type: 'metadata',
+						type: 'metadata', 
 						items: [
 							'NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES'][Math.floor(Math.random()*4)],
 							`© ${new Date().getFullYear()} ABNORMAL STUDIOS`
 						],
-						startY: h * 0.94,
-						layout: 'centered'
+						fontSize: Math.max(12, Math.floor(w / 60)),
+						spacing: 1.3,
+						weight: 'normal'
 					}
 				];
 				
-				creditSections.forEach(section => {
-					this.renderCreditSection(ctx, section, w, h, styling);
+				this.renderCreditSections(ctx, sections, w, creditStartY, availableHeight, styling);
+			}
+
+			renderCreditSections(ctx, sections, w, startY, availableHeight, styling) {
+				let currentY = startY;
+				const sectionGap = Math.floor(availableHeight * 0.08); // 8% gap between sections
+				
+				sections.forEach((section, sectionIndex) => {
+					if (currentY >= startY + availableHeight) return; // Stop if out of space
+					
+					const { type, items, fontSize, spacing, weight } = section;
+					
+					if (type === 'cast') {
+						currentY = this.renderCastSection(ctx, items, w, currentY, fontSize, spacing, weight, styling);
+					} else {
+						currentY = this.renderTextSection(ctx, items, w, currentY, fontSize, spacing, weight, styling);
+					}
+					
+					// Add gap between sections (but not after the last one)
+					if (sectionIndex < sections.length - 1) {
+						currentY += sectionGap;
+					}
 				});
 			}
 
-			// NEW: Individual credit section renderer
-			renderCreditSection(ctx, section, w, h, styling) {
-				const { type, names, items, startY, layout } = section;
+			renderCastSection(ctx, cast, w, startY, fontSize, spacing, weight, styling) {
 				let currentY = startY;
+				const lineHeight = fontSize * spacing;
 				
-				if (type === 'cast' && names && names.length) {
-					// Enhanced cast layout
-					const fontSize = Math.max(16, Math.floor(w / 45));
-					const lineHeight = fontSize * 2.5;
-					const maxY = h - Math.floor(h * 0.12); // Bottom margin
-					
-					ctx.font = `bold ${fontSize}px ${styling.creditsFont || 'Arial'}`;
-					ctx.fillStyle = styling.creditsColor;
-					ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-					ctx.shadowBlur = 4;
-					
-					names.forEach((name, index) => {
-						if (currentY + fontSize > maxY) return; // Stop if we run out of space
+				ctx.font = `${weight} ${fontSize}px ${styling.creditsFont || 'Arial'}`;
+				ctx.fillStyle = styling.creditsColor;
+				ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+				ctx.shadowBlur = 3;
+				
+				// Smart positioning based on cast size
+				if (cast.length <= 2) {
+					// Center single actors
+					cast.forEach(actor => {
+						const cleanName = String(actor).split(' AS ')[0].toUpperCase();
+						ctx.textAlign = 'center';
+						ctx.fillText(cleanName, w / 2, currentY);
+						currentY += lineHeight;
+					});
+				} else {
+					// Two-column layout for multiple actors
+					cast.forEach((actor, index) => {
+						const cleanName = String(actor).split(' AS ')[0].toUpperCase();
 						
-						const cleanName = String(name).split(' AS ')[0].toUpperCase();
-						const character = String(name).split(' AS ')[1];
-						
-						// Smarter positioning based on number of actors
-						let xPos;
-						if (names.length <= 2) {
-							xPos = w / 2;
-							ctx.textAlign = 'center';
-						} else if (names.length <= 4) {
-							// Two columns
-							xPos = (index % 2 === 0) ? w * 0.3 : w * 0.7;
-							ctx.textAlign = 'center';
-						} else {
-							// Staggered layout for many actors
-							const positions = [0.2, 0.8, 0.35, 0.65, 0.15, 0.85];
-							xPos = w * positions[index % positions.length];
-							ctx.textAlign = 'center';
-						}
-						
-						// Truncate if too long
+						// Truncate long names
 						let displayName = cleanName;
 						const maxWidth = w * 0.35;
-						while (ctx.measureText(displayName).width > maxWidth && displayName.length > 10) {
+						while (ctx.measureText(displayName).width > maxWidth && displayName.length > 8) {
 							displayName = displayName.substring(0, displayName.length - 3) + '...';
 						}
 						
-						// Draw actor name
+						// Position: left column for even indices, right for odd
+						const isLeft = index % 2 === 0;
+						const xPos = isLeft ? w * 0.25 : w * 0.75;
+						ctx.textAlign = 'center';
+						
 						ctx.fillText(displayName, xPos, currentY);
 						
-						// Draw character name if exists
-						if (character) {
-							ctx.save();
-							ctx.font = `italic ${Math.floor(fontSize * 0.75)}px ${styling.creditsFont || 'Arial'}`;
-							ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-							
-							let displayChar = 'AS ' + character.toUpperCase();
-							while (ctx.measureText(displayChar).width > maxWidth && displayChar.length > 8) {
-								displayChar = displayChar.substring(0, displayChar.length - 3) + '...';
-							}
-							
-							ctx.fillText(displayChar, xPos, currentY + fontSize * 1.2);
-							ctx.restore();
-						}
-						
-						// Advance Y position strategically
-						if (names.length <= 2 || index % 2 === 1 || index === names.length - 1) {
+						// Only advance Y every 2 actors (since we're doing 2 columns)
+						if (!isLeft || index === cast.length - 1) {
 							currentY += lineHeight;
 						}
 					});
-					
-					ctx.shadowBlur = 0;
-					
-				} else if ((items || []).length) {
-					// Crew and metadata - centered layout
-					const fontSize = type === 'crew' ? Math.max(14, Math.floor(w / 50)) : Math.max(12, Math.floor(w / 60));
-					ctx.font = `${type === 'crew' ? 'bold' : 'normal'} ${fontSize}px ${styling.creditsFont || 'Arial'}`;
-					ctx.fillStyle = styling.creditsColor;
-					ctx.textAlign = 'center';
-					
-					items.forEach((item, index) => {
-						if (!item) return;
-						const yPos = currentY + (index * fontSize * 1.4);
-						if (yPos < h - 10) { // Make sure we don't go off bottom
-							ctx.fillText(String(item), w / 2, yPos);
-						}
-					});
-				}
-			}
-
-			// NEW: Era-specific text effects
-			applyEraTextEffects(ctx, text, x, y, decade, fontSize, styling) {
-				ctx.save();
-				
-				switch(decade) {
-					case '1980s':
-						// Chrome/neon effect for sci-fi
-						if (styling.titleColor.includes('cyan') || styling.titleColor.includes('00ffff')) {
-							ctx.strokeStyle = styling.titleGlow;
-							ctx.lineWidth = Math.max(2, fontSize / 30);
-							ctx.strokeText(text, x, y);
-						}
-						
-						ctx.fillStyle = styling.titleColor;
-						ctx.shadowColor = styling.titleGlow;
-						ctx.shadowBlur = Math.max(fontSize / 4, 15);
-						ctx.fillText(text, x, y);
-						break;
-						
-					case '1970s':
-						// Drop shadow effect
-						ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-						ctx.fillText(text, x + Math.floor(fontSize / 20), y + Math.floor(fontSize / 20));
-						
-						ctx.fillStyle = styling.titleColor;
-						ctx.shadowColor = styling.titleGlow;
-						ctx.shadowBlur = Math.max(fontSize / 6, 10);
-						ctx.fillText(text, x, y);
-						break;
-						
-					case '1950s':
-						// Vintage letterpress effect
-						ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-						ctx.fillText(text, x + 2, y + 2);
-						
-						ctx.fillStyle = styling.titleColor;
-						ctx.fillText(text, x, y);
-						break;
-						
-					default:
-						// Clean modern with subtle shadow
-						ctx.fillStyle = styling.titleColor;
-						ctx.shadowColor = styling.titleGlow;
-						ctx.shadowBlur = Math.max(fontSize / 8, 8);
-						ctx.fillText(text, x, y);
 				}
 				
-				ctx.restore();
+				ctx.shadowBlur = 0;
+				return currentY;
 			}
 
-			// NEW: Fallback cast generator (replaces the inline generation in your old code)
+			renderTextSection(ctx, items, w, startY, fontSize, spacing, weight, styling) {
+				let currentY = startY;
+				const lineHeight = fontSize * spacing;
+				
+				ctx.font = `${weight} ${fontSize}px ${styling.creditsFont || 'Arial'}`;
+				ctx.fillStyle = styling.creditsColor;
+				ctx.textAlign = 'center';
+				
+				items.forEach(item => {
+					if (item && currentY < startY + 200) { // Safety check
+						ctx.fillText(String(item), w / 2, currentY);
+						currentY += lineHeight;
+					}
+				});
+				
+				return currentY;
+			}
+
+			// IMPROVED: Better fallback cast with no duplicates
 			generateFallbackCast() {
-				const firstNames = ["Elena","Marcus","Zara","Vincent","Luna","Dante","Iris","Phoenix","Nova","Atlas"];
-				const lastNames = ["Cross","Vale","Storm","Kane","Thorne","Rivers","Blake","Steel","Fox","Night"];
+				const names = [
+					'ELENA CROSS', 'MARCUS VALE', 'ZARA STORM', 'VINCENT KANE',
+					'LUNA THORNE', 'DANTE RIVERS', 'IRIS BLAKE', 'PHOENIX STEEL',
+					'NOVA FOX', 'ATLAS NIGHT', 'SAGE HUNTER', 'RAVEN COLE'
+				];
 				
-				const cast = [];
-				for (let i = 0; i < 4; i++) {
-					const first = firstNames[Math.floor(Math.random() * firstNames.length)];
-					const last = lastNames[Math.floor(Math.random() * lastNames.length)];
-					cast.push((first + ' ' + last).toUpperCase());
-				}
-				return cast;
+				// Shuffle and take first 4 to avoid duplicates
+				const shuffled = names.sort(() => Math.random() - 0.5);
+				return shuffled.slice(0, 4);
 			}
 
 
