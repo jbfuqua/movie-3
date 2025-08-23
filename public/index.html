@@ -1022,10 +1022,11 @@ if (concept.director) {
 }
 creditsLines.push({ text: 'AN ABNORMAL STUDIOS FILM', type: 'studio', align: 'center' });
 
-const runtimeOptions = ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES','124 MINUTES','138 MINUTES'];
-const randomRuntime = runtimeOptions[Math.floor(Math.random()*runtimes.length)];
-creditsLines.push({ text: 'NR  •  ' + randomRuntime, type: 'rating', align: 'center' });
-
+creditsLines.push({
+  text: 'NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES','124 MINUTES','138 MINUTES'][Math.floor(Math.random()*6)],
+  type: 'rating',
+  align: 'center'
+});
 creditsLines.push({ text: '© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS', type: 'copyright', align: 'center' });
 
 const creditSizes = {
