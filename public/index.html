@@ -278,26 +278,6 @@
 
     <script>
         class EnhancedPosterAI {
-
-    // Wrapper for compatibility: map generateConcept to generateMovieConcept
-    generateConcept() {
-        return this.generateMovieConcept();
-    }
-
-    // Build a concise visual intent string from concept.visual_spec
-    buildVisualIntent(concept) {
-        const vs = (concept && concept.visual_spec) ? concept.visual_spec : {};
-        const parts = [
-            vs.composition || '',
-            vs.lighting || '',
-            vs.environment || ''
-        ];
-        if (Array.isArray(vs.motifs) && vs.motifs.length) {
-            parts.push(vs.motifs.slice(0, 2).join(', '));
-        }
-        return parts.filter(Boolean).join(', ');
-    }
-
             constructor() {
                 console.log('EnhancedPosterAI constructor called');
                 
@@ -663,70 +643,103 @@
                 return stylings[decade] || stylings['1980s'];
             }
 
-            // Center-crop to an Instagram-friendly portrait canvas with "cover" fit.
-// - Defaults to 4:5 (1.25). Set this.aspectRatio = 1.5 for 2:3 if you prefer.
-// - Uses existing this.elements.canvas and this.ctx.
-// - Returns a Promise that resolves when drawing is complete.
-			smartCropToInstagramRatio(imageUrl) {
-			  const self = this;
-			  return new Promise((resolve) => {
-				try {
-				  const img = new Image();
-				  img.crossOrigin = 'anonymous'; // safe for canvas toDataURL when using data: URIs
+            smartCropToInstagramRatio(imageUrl) {
+                const self = this;
+                return new Promise(function(resolve) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const isMobile = window.innerWidth <= 768;
+                        const targetW = isMobile ? 512 : 1024; 
+                        const targetH = Math.floor(targetW * 1.25);
+                        const step = isMobile ? 16 : 32;
+                        let bestCrop = { y: 0, score: -Infinity };
 
-				  img.onload = function () {
-					const canvas = self.elements.canvas;
-					const ctx = self.ctx;
+                        const tempCanvas = document.createElement('canvas');
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCanvas.width = img.width;
+                        tempCanvas.height = img.height;
+						
+						try {
+							// Ensure canvas dimensions are valid
+							if (targetW <= 0 || targetH <= 0) {
+								console.error('Invalid canvas dimensions:', targetW, targetH);
+								resolve();
+								return;
+							}
+							
+							// Apply DPI scaling if needed
+							const dpr = window.devicePixelRatio || 1;
+							if (dpr > 1 && this.originalCanvasSize) {
+								self.elements.canvas.width = targetW * dpr;
+								self.elements.canvas.height = targetH * dpr;
+								self.ctx.scale(dpr, dpr);
+							} else {
+								self.elements.canvas.width = targetW;
+								self.elements.canvas.height = targetH;
+							}
+						
+                        tempCtx.drawImage(img, 0, 0);
 
-					// Target size: responsive width, fixed portrait aspect
-					const isMobile = window.innerWidth <= 768;
-					const targetW = isMobile ? 512 : 1024;
-					const aspect = (typeof self.aspectRatio === 'number' && self.aspectRatio > 0) ? self.aspectRatio : 1.25; // 4:5 by default
-					const targetH = Math.floor(targetW * aspect);
+						} catch (error) {
+							console.error('Error setting up canvas:', error);
+							resolve();
+							return;
+						}
 
-					// Prepare destination
-					canvas.width = targetW;
-					canvas.height = targetH;
-					ctx.clearRect(0, 0, targetW, targetH);
+                        for (let y = 0; y <= img.height - targetH; y += step) {
+                            try {
+                                const sampleY = y + Math.floor(targetH * 0.25);
+                                const sampleH = Math.floor(targetH * 0.5);
+                                const imageData = tempCtx.getImageData(0, sampleY, targetW, sampleH);
+                                const data = imageData.data;
+                                
+                                let sum = 0;
+                                let sum2 = 0;
+                                let count = 0;
+                                const sampleRate = isMobile ? 32 : 16;
+                                
+                                for (let i = 0; i < data.length; i += sampleRate) {
+                                    const r = data[i];
+                                    const g = data[i + 1];
+                                    const b = data[i + 2];
+                                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                                    sum += brightness;
+                                    sum2 += brightness * brightness;
+                                    count++;
+                                }
+                                
+                                const mean = sum / count;
+                                const variance = sum2 / count - mean * mean;
+                                
+                                if (variance > bestCrop.score) {
+                                    bestCrop = { y: y, score: variance };
+                                }
+                            } catch (error) {
+                                continue;
+                            }
+                        }
 
-					// High-quality resampling
-					if (ctx.imageSmoothingEnabled !== undefined) {
-					  ctx.imageSmoothingEnabled = true;
-					  if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
-					}
-
-					// ---- Cover fit + centered crop (no blank space) ----
-					// Scale so the image fully covers the destination (like CSS object-fit: cover)
-					const scale = Math.max(targetW / img.width, targetH / img.height);
-
-					// Compute the source rect in ORIGINAL image space
-					const sWidth  = targetW / scale;
-					const sHeight = targetH / scale;
-					const sx = Math.max(0, (img.width  - sWidth)  / 2);
-					const sy = Math.max(0, (img.height - sHeight) / 2);
-
-					// Draw centered into the destination canvas
-					ctx.drawImage(
-					  img,
-					  sx, sy, sWidth, sHeight, // source rectangle
-					  0,  0, targetW, targetH  // destination rectangle
-					);
-
-					resolve();
-				  };
-
-				  img.onerror = function () {
-					// Fail gracefully: leave canvas untouched and continue pipeline
-					resolve();
-				  };
-
-				  img.src = imageUrl; // should already be a data: URI from your handleGeneration normalization
-				} catch (_) {
-				  resolve();
-				}
-			  });
-			}
-
+                        self.elements.canvas.width = targetW;
+                        self.elements.canvas.height = targetH;
+                        self.ctx.clearRect(0, 0, targetW, targetH);
+                        self.ctx.drawImage(img, 0, bestCrop.y, targetW, targetH, 0, 0, targetW, targetH);
+                        
+                        self.ctx.imageSmoothingEnabled = true;
+                        if (self.ctx.imageSmoothingQuality) {
+                            self.ctx.imageSmoothingQuality = 'high';
+                        }
+                        
+                        tempCanvas.width = 0;
+                        tempCanvas.height = 0;
+                        
+                        resolve();
+                    };
+                    img.onerror = function() {
+                        resolve();
+                    };
+                    img.src = imageUrl;
+                });
+            }
 
             addGradientOverlays() {
                 const canvas = this.elements.canvas;
@@ -987,47 +1000,37 @@
 							ctx.shadowBlur = 0;
 						}
 
-						// Render credits (simplified)
-						const runtimeOptions = ['89 MINUTES', '95 MINUTES', '103 MINUTES', '117 MINUTES', '124 MINUTES', '138 MINUTES'];
-						const randomRuntime = runtimeOptions[Math.floor(Math.random() * runtimes.length)];
-						
-						let creditsStartY
+						// Render credits (with cast + checkerboarding)
+let creditsStartY // removed stray assignment
+
 // --- Build cast credits with fallback and checkerboarding ---
 let castNames = [];
 if (Array.isArray(concept.cast) && concept.cast.length) {
   castNames = concept.cast.slice(0, 6).map(n => String(n).trim());
 } else {
-  const firstNames = ["Alex", "Jordan", "Taylor", "Morgan", "Riley", "Casey", "Jamie", "Sam", "Cameron", "Dana"];
-  const lastNames  = ["Reeves", "Winters", "Stone", "Black", "Knight", "Frost", "Hale", "Rivera", "Cole", "Summers"];
+  const firstNames = ["Alex","Jordan","Taylor","Morgan","Riley","Casey","Jamie","Sam","Cameron","Dana"];
+  const lastNames  = ["Reeves","Winters","Stone","Black","Knight","Frost","Hale","Rivera","Cole","Summers"];
   for (let i = 0; i < 4; i++) {
     const fn = firstNames[Math.floor(Math.random()*firstNames.length)];
     const ln = lastNames[Math.floor(Math.random()*lastNames.length)];
-    castNames.push(`${fn.toUpperCase()} ${ln.toUpperCase()}`);
+    castNames.push((fn + ' ' + ln).toUpperCase());
   }
 }
 
 const creditsLines = [];
-
-// Cast alternating left/right
 castNames.forEach((name, i) => {
-  creditsLines.push({
-    text: name,
-    type: 'cast',
-    align: (i % 2 === 0) ? 'left' : 'right'
-  });
+  creditsLines.push({ text: name, type: 'cast', align: (i % 2 === 0) ? 'left' : 'right' });
 });
 
 if (concept.director) {
-  creditsLines.push({ text: 'DIRECTED BY ' + concept.director.toUpperCase(), type: 'director', align: 'center' });
+  creditsLines.push({ text: ('DIRECTED BY ' + String(concept.director).toUpperCase()), type: 'director', align: 'center' });
 }
 creditsLines.push({ text: 'AN ABNORMAL STUDIOS FILM', type: 'studio', align: 'center' });
 
-creditsLines.push({
-  text: 'NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES','124 MINUTES','138 MINUTES'][Math.floor(Math.random()*6)],
-  type: 'rating',
-  align: 'center'
-});
-creditsLines.push({ text: '© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS', type: 'copyright', align: 'center' });
+// Inline runtime pick (avoid duplicate declarations)
+creditsLines.push({ text: ('NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES','124 MINUTES','138 MINUTES'][Math.floor(Math.random()*6)]), type: 'rating', align: 'center' });
+
+creditsLines.push({ text: ('© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS'), type: 'copyright', align: 'center' });
 
 const creditSizes = {
   cast: Math.max(14, Math.floor(w / 52)),
@@ -1037,98 +1040,64 @@ const creditSizes = {
   copyright: Math.max(9, Math.floor(w / 65))
 };
 
-creditsLines.forEach((credit, i) => {
-  if (!credit.text) return;
-  const size = creditSizes[credit.type] || Math.max(12, Math.floor(w / 55));
-  ctx.font = `bold ${size}px ${fontFamily}`;
-  ctx.fillStyle = 'white';
-  ctx.textBaseline = 'top';
+let currentY = creditsStartY;
+ctx.textAlign = 'center';
 
-  const y = creditsStartY + (i * (size + 6));
+for (let i = 0; i < creditsLines.length; i++) {
+  const credit = creditsLines[i];
+  if (!credit.text) continue;
 
+  const fontSize = creditSizes[credit.type] || creditSizes.rating;
+  const lineHeight = fontSize * 1.4;
+
+  if (currentY + fontSize > h - 5) continue;
+
+  ctx.font = 'bold ' + fontSize + 'px ' + styling.creditsFont;
+
+  // Optional subtle shadow for readability
+  if (credit.type === 'studio') {
+    ctx.shadowColor = styling.titleGlow;
+    ctx.shadowBlur = fontSize / 4;
+  } else {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = fontSize / 6;
+  }
+
+  let displayLine = credit.text;
+  let truncateCount = 0;
+  while (ctx.measureText(displayLine).width > maxTextWidth &&
+         displayLine.length > 10 &&
+         truncateCount < 20) {
+    displayLine = displayLine.substring(0, displayLine.length - 4) + '...';
+    truncateCount++;
+  }
+
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+  ctx.lineWidth = 2;
+
+  // Align and draw
   if (credit.align === 'left') {
     ctx.textAlign = 'left';
-    ctx.fillText(credit.text, w * 0.1, y);
+    ctx.strokeText(displayLine, w * 0.1, currentY);
+    ctx.fillStyle = styling.creditsColor;
+    ctx.fillText(displayLine, w * 0.1, currentY);
   } else if (credit.align === 'right') {
     ctx.textAlign = 'right';
-    ctx.fillText(credit.text, w * 0.9, y);
+    ctx.strokeText(displayLine, w * 0.9, currentY);
+    ctx.fillStyle = styling.creditsColor;
+    ctx.fillText(displayLine, w * 0.9, currentY);
   } else {
     ctx.textAlign = 'center';
-    ctx.fillText(credit.text, w / 2, y);
+    ctx.strokeText(displayLine, w / 2, currentY);
+    ctx.fillStyle = styling.creditsColor;
+    ctx.fillText(displayLine, w / 2, currentY);
   }
-});
- = h * 0.78;
-						
-						// Skip actors for now to prevent hanging - just do basic credits
-						const remainingCredits = [
-							{
-								text: concept.director ? 'DIRECTED BY ' + concept.director.toUpperCase() : '',
-								type: 'director'
-							},
-							{
-								text: 'AN ABNORMAL STUDIOS FILM',
-								type: 'studio'
-							},
-							{
-								text: 'NR  •  ' + randomRuntime,
-								type: 'rating'
-							},
-							{
-								text: '© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS',
-								type: 'copyright'
-							}
-						].filter(function(credit) { return credit.text; });
 
-						const creditSizes = {
-							director: Math.max(12, Math.floor(w / 55)), 
-							studio: Math.max(14, Math.floor(w / 50)),    
-							rating: Math.max(11, Math.floor(w / 60)),    
-							copyright: Math.max(9, Math.floor(w / 65))  
-						};
-						
-						let currentY = creditsStartY;
-						ctx.textAlign = 'center';
-						
-						for (let i = 0; i < remainingCredits.length; i++) {
-							const credit = remainingCredits[i];
-							if (!credit.text) continue;
-							
-							const fontSize = creditSizes[credit.type] || creditSizes.rating;
-							const lineHeight = fontSize * 1.4;
-							
-							if (currentY + fontSize > h - 5) continue;
-							
-							ctx.font = 'bold ' + fontSize + 'px ' + styling.creditsFont;
-							
-							let displayLine = credit.text;
-							let truncateCount = 0;
-							while (ctx.measureText(displayLine).width > maxTextWidth && 
-								   displayLine.length > 10 && 
-								   truncateCount < 20) { // Safety limit
-								displayLine = displayLine.substring(0, displayLine.length - 4) + '...';
-								truncateCount++;
-							}
-							
-							if (credit.type === 'studio') {
-								ctx.shadowColor = styling.titleGlow;
-								ctx.shadowBlur = fontSize / 4;
-							} else {
-								ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-								ctx.shadowBlur = fontSize / 6;
-							}
-							
-							ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-							ctx.lineWidth = 2;
-							ctx.strokeText(displayLine, w / 2, currentY);
-							
-							ctx.fillStyle = styling.creditsColor;
-							ctx.fillText(displayLine, w / 2, currentY);
-							
-							currentY += lineHeight;
-							ctx.shadowBlur = 0;
-						}
-						
-						console.log('Text rendering completed');
+  currentY += lineHeight;
+  ctx.shadowBlur = 0;
+}
+
+console.log('Text rendering completed');
 						clearTimeout(timeout);
 						resolve();
 						
@@ -1650,65 +1619,62 @@ creditsLines.forEach((credit, i) => {
             }
 
             async handleGeneration() {
-			  try {
-				this.clearError?.();
-				this.setLoadingState(true);
+                console.log('handleGeneration called');
 
-				// Concept
-				this.updateProgress('concept', 10);
-				const concept = await this.generateConcept();
-				if (!concept) {
-				  this.setLoadingState(false);
-				  return;
+				if (this.isGenerating) {
+					console.log('Generation already in progress, aborting');
+					return;
 				}
-				this.currentConcept = concept;
-				this.updateInfo(concept);
+                 
+                this.hideError();
+                this.setLoadingState(true);
+                this.updateInfo({ decade: '...', genre: '...', title: '...', tagline: '...', synopsis: '...' });
 
-				// Image
-				this.updateProgress('image', 40);
-				const baseImageUrl = await this.generateImage(this.buildVisualIntent(concept), concept);
-				if (!baseImageUrl) {
-				  this.setLoadingState(false);
-				  return;
-				}
+                try {
+                    this.updateProgress('concept', 10);
+                    const concept = await this.generateMovieConcept();
+                    if (!concept) {
+                        this.setLoadingState(false);
+                        return;
+                    }
+                    
+                    concept.artStyle = this.elements.artStyleFilter.value;
+                    this.currentConcept = concept;
+                    this.updateInfo(concept);
 
-				// Normalize to a safe data: URI so canvas operations never taint or get blocked
-				const _safeBase = (
-				  typeof baseImageUrl === 'string' && baseImageUrl.startsWith('data:')
-				) ? baseImageUrl
-				  : (/^https?:\/\//.test(baseImageUrl) ? baseImageUrl
-				  : `data:image/png;base64,${baseImageUrl}`);
+                    this.updateProgress('image', 40);
+                    const baseImageUrl = await this.generateImage(concept.visual_elements, concept);
+                    if (!baseImageUrl) {
+                        this.setLoadingState(false);
+                        return;
+                    }
 
-				// Crop & compose
-				this.updateProgress('text', 70);
-				await this.smartCropToInstagramRatio(_safeBase);   // this contains the center-crop fix
-				this.addGradientOverlays?.();
-				await this.renderTitleAndCredits(concept);
-
-				// Optional: soundtrack (only if your app already calls it)
-				if (typeof this.generateSong === 'function') {
-				  this.updateProgress('song', 85);
-				  try { await this.generateSong(concept); } catch (_) { /* non-fatal */ }
-				}
-
-				// Finalize
-				this.updateProgress('complete', 100);
-				const finalImageUrl = this.elements.canvas.toDataURL('image/png');
-				this.elements.posterImage.src = finalImageUrl;
-
-				// Track recent
-				this.recentPosters = this.recentPosters || [];
-				this.recentPosters.unshift({ imageUrl: finalImageUrl, concept });
-				if (this.recentPosters.length > 12) this.recentPosters.pop();
-
-			  } catch (error) {
-				console.error('Error in generation process:', error);
-				this.showError?.('Error in generation process: ' + (error?.message || error));
-			  } finally {
-				this.setLoadingState(false);
-			  }
-			}
-
+                    this.updateProgress('text', 70);
+                    await this.smartCropToInstagramRatio(baseImageUrl);
+                    this.addGradientOverlays();
+                    await this.renderTitleAndCredits(concept);
+                    
+                    this.updateProgress('song', 85);
+                    
+                    this.updateProgress('complete', 100);
+                    const finalImageUrl = this.elements.canvas.toDataURL('image/png');
+                    this.elements.posterImage.src = finalImageUrl;
+                    
+                    this.addToRecent(finalImageUrl, concept);
+                    
+                    this.generationCount++;
+                    this.elements.generationCounter.textContent = this.generationCount + ' poster' + (this.generationCount !== 1 ? 's' : '') + ' created';
+                    
+                } catch (error) {
+                    console.error("Error in generation process:", error);
+                    this.showError("Failed to process the poster. Please try again.");
+                } finally {
+                    this.setLoadingState(false);
+                    if (this.autoGenerate) {
+                        this.startAutoTimer();
+                    }
+                }
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
