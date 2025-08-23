@@ -851,194 +851,236 @@
 				return measurement;
 			}
 			
-			renderActorsCheckerboard(actors, ctx, startY, maxWidth, styling) {
-				if (!actors || actors.length === 0) return startY;
-				
+
+			// REPLACE your existing renderTitleAndCredits function with this enhanced version
+			async renderTitleAndCredits(concept) {
 				const canvas = this.elements.canvas;
+				const ctx = this.ctx;
 				const w = canvas.width;
-				const actorFontSize = Math.max(14, Math.floor(w / 50));
-				const charFontSize = Math.max(12, Math.floor(w / 55));
-				const lineHeight = actorFontSize * 2.2;
+				const h = canvas.height;
+
+				// Get era-specific styling (keep your existing getEraSpecificStyling)
+				this.styling = this.getEraSpecificStyling(concept.decade, concept.genre);
+				const styling = this.styling;
+
+				// --- TITLE RENDERING (Enhanced) ---
+				this.renderEnhancedTitle(ctx, concept, w, h, styling);
+
+				// --- CREDITS RENDERING (New System) ---
+				this.renderCreditsWithHierarchy(ctx, concept, canvas, styling);
+			}
+
+			// NEW: Enhanced title rendering with era effects
+			renderEnhancedTitle(ctx, concept, w, h, styling) {
+				const titleText = (concept?.title || 'UNTITLED').toUpperCase();
+				const maxTextWidth = Math.floor(w * 0.88);
 				
+				ctx.textBaseline = 'top';
+				ctx.textAlign = 'center';
+
+				// Dynamic font sizing
+				let fontSize = Math.min(Math.floor(w / 8), 120);
+				ctx.font = `bold ${fontSize}px ${styling.titleFont}`;
+
+				// Shrink to fit
+				while (ctx.measureText(titleText).width > maxTextWidth && fontSize > 20) {
+					fontSize -= 2;
+					ctx.font = `bold ${fontSize}px ${styling.titleFont}`;
+				}
+
+				// Apply era-specific effects
+				this.applyEraTextEffects(ctx, titleText, Math.floor(w / 2), Math.floor(h * 0.10), concept.decade, fontSize, styling);
+			}
+
+			// NEW: Enhanced credit rendering system
+			renderCreditsWithHierarchy(ctx, concept, canvas, styling) {
+				const w = canvas.width;
+				const h = canvas.height;
+				
+				// Credit sections with positioning
+				const creditSections = [
+					{
+						type: 'cast',
+						names: (concept.cast || this.generateFallbackCast()).slice(0, 6),
+						startY: h * 0.75,
+						layout: 'dynamic'
+					},
+					{
+						type: 'crew',
+						items: [
+							concept.director ? `DIRECTED BY ${concept.director.toUpperCase()}` : null,
+							'AN ABNORMAL STUDIOS FILM'
+						].filter(Boolean),
+						startY: h * 0.88,
+						layout: 'centered'
+					},
+					{
+						type: 'metadata',
+						items: [
+							'NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES'][Math.floor(Math.random()*4)],
+							`© ${new Date().getFullYear()} ABNORMAL STUDIOS`
+						],
+						startY: h * 0.94,
+						layout: 'centered'
+					}
+				];
+				
+				creditSections.forEach(section => {
+					this.renderCreditSection(ctx, section, w, h, styling);
+				});
+			}
+
+			// NEW: Individual credit section renderer
+			renderCreditSection(ctx, section, w, h, styling) {
+				const { type, names, items, startY, layout } = section;
 				let currentY = startY;
 				
-				const actorData = actors.slice(0, 3).map(function(actor) {
-					const parts = actor.split(' AS ');
-					return {
-						name: parts[0] || actor,
-						character: parts[1] || ''
-					};
-				});
-				
-				for (let index = 0; index < actorData.length; index++) {
-					const actor = actorData[index];
+				if (type === 'cast' && names && names.length) {
+					// Enhanced cast layout
+					const fontSize = Math.max(16, Math.floor(w / 45));
+					const lineHeight = fontSize * 2.5;
+					const maxY = h - Math.floor(h * 0.12); // Bottom margin
 					
-					// Simple left/right alternating, with first actor centered
-					let xPos = w / 2; // Start with center
-					if (index === 1) xPos = w * 0.3; // Second actor left
-					if (index === 2) xPos = w * 0.7; // Third actor right
-					
-					ctx.textAlign = 'center';
-					
-					ctx.font = 'bold ' + actorFontSize + 'px ' + styling.creditsFont;
-					ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-					ctx.shadowBlur = actorFontSize / 6;
-					ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-					ctx.lineWidth = 2;
+					ctx.font = `bold ${fontSize}px ${styling.creditsFont || 'Arial'}`;
 					ctx.fillStyle = styling.creditsColor;
+					ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+					ctx.shadowBlur = 4;
 					
-					let displayName = actor.name;
-					const nameMaxWidth = maxWidth * 0.3; // Give more space per actor
-					while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 10) {
-						displayName = displayName.substring(0, displayName.length - 3) + '...';
-					}
-					
-					ctx.strokeText(displayName, xPos, currentY);
-					ctx.fillText(displayName, xPos, currentY);
-					
-					if (actor.character) {
-						ctx.font = 'italic ' + charFontSize + 'px ' + styling.creditsFont;
-						ctx.shadowBlur = charFontSize / 8;
-						ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+					names.forEach((name, index) => {
+						if (currentY + fontSize > maxY) return; // Stop if we run out of space
 						
-						let displayChar = 'AS ' + actor.character;
-						while (ctx.measureText(displayChar).width > nameMaxWidth && displayChar.length > 10) {
-							displayChar = displayChar.substring(0, displayChar.length - 3) + '...';
+						const cleanName = String(name).split(' AS ')[0].toUpperCase();
+						const character = String(name).split(' AS ')[1];
+						
+						// Smarter positioning based on number of actors
+						let xPos;
+						if (names.length <= 2) {
+							xPos = w / 2;
+							ctx.textAlign = 'center';
+						} else if (names.length <= 4) {
+							// Two columns
+							xPos = (index % 2 === 0) ? w * 0.3 : w * 0.7;
+							ctx.textAlign = 'center';
+						} else {
+							// Staggered layout for many actors
+							const positions = [0.2, 0.8, 0.35, 0.65, 0.15, 0.85];
+							xPos = w * positions[index % positions.length];
+							ctx.textAlign = 'center';
 						}
 						
-						ctx.strokeText(displayChar, xPos, currentY + charFontSize * 1.4);
-						ctx.fillText(displayChar, xPos, currentY + charFontSize * 1.4);
-					}
+						// Truncate if too long
+						let displayName = cleanName;
+						const maxWidth = w * 0.35;
+						while (ctx.measureText(displayName).width > maxWidth && displayName.length > 10) {
+							displayName = displayName.substring(0, displayName.length - 3) + '...';
+						}
+						
+						// Draw actor name
+						ctx.fillText(displayName, xPos, currentY);
+						
+						// Draw character name if exists
+						if (character) {
+							ctx.save();
+							ctx.font = `italic ${Math.floor(fontSize * 0.75)}px ${styling.creditsFont || 'Arial'}`;
+							ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+							
+							let displayChar = 'AS ' + character.toUpperCase();
+							while (ctx.measureText(displayChar).width > maxWidth && displayChar.length > 8) {
+								displayChar = displayChar.substring(0, displayChar.length - 3) + '...';
+							}
+							
+							ctx.fillText(displayChar, xPos, currentY + fontSize * 1.2);
+							ctx.restore();
+						}
+						
+						// Advance Y position strategically
+						if (names.length <= 2 || index % 2 === 1 || index === names.length - 1) {
+							currentY += lineHeight;
+						}
+					});
+					
+					ctx.shadowBlur = 0;
+					
+				} else if ((items || []).length) {
+					// Crew and metadata - centered layout
+					const fontSize = type === 'crew' ? Math.max(14, Math.floor(w / 50)) : Math.max(12, Math.floor(w / 60));
+					ctx.font = `${type === 'crew' ? 'bold' : 'normal'} ${fontSize}px ${styling.creditsFont || 'Arial'}`;
+					ctx.fillStyle = styling.creditsColor;
+					ctx.textAlign = 'center';
+					
+					items.forEach((item, index) => {
+						if (!item) return;
+						const yPos = currentY + (index * fontSize * 1.4);
+						if (yPos < h - 10) { // Make sure we don't go off bottom
+							ctx.fillText(String(item), w / 2, yPos);
+						}
+					});
+				}
+			}
+
+			// NEW: Era-specific text effects
+			applyEraTextEffects(ctx, text, x, y, decade, fontSize, styling) {
+				ctx.save();
+				
+				switch(decade) {
+					case '1980s':
+						// Chrome/neon effect for sci-fi
+						if (styling.titleColor.includes('cyan') || styling.titleColor.includes('00ffff')) {
+							ctx.strokeStyle = styling.titleGlow;
+							ctx.lineWidth = Math.max(2, fontSize / 30);
+							ctx.strokeText(text, x, y);
+						}
+						
+						ctx.fillStyle = styling.titleColor;
+						ctx.shadowColor = styling.titleGlow;
+						ctx.shadowBlur = Math.max(fontSize / 4, 15);
+						ctx.fillText(text, x, y);
+						break;
+						
+					case '1970s':
+						// Drop shadow effect
+						ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+						ctx.fillText(text, x + Math.floor(fontSize / 20), y + Math.floor(fontSize / 20));
+						
+						ctx.fillStyle = styling.titleColor;
+						ctx.shadowColor = styling.titleGlow;
+						ctx.shadowBlur = Math.max(fontSize / 6, 10);
+						ctx.fillText(text, x, y);
+						break;
+						
+					case '1950s':
+						// Vintage letterpress effect
+						ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+						ctx.fillText(text, x + 2, y + 2);
+						
+						ctx.fillStyle = styling.titleColor;
+						ctx.fillText(text, x, y);
+						break;
+						
+					default:
+						// Clean modern with subtle shadow
+						ctx.fillStyle = styling.titleColor;
+						ctx.shadowColor = styling.titleGlow;
+						ctx.shadowBlur = Math.max(fontSize / 8, 8);
+						ctx.fillText(text, x, y);
 				}
 				
-				// Return Y position after ALL actors (not after each one)
-				ctx.shadowBlur = 0;
-				return currentY + lineHeight;
+				ctx.restore();
 			}
 
-			async renderTitleAndCredits(concept) {
-			  const canvas = this.elements.canvas;
-			  const ctx = this.ctx;
-			  const w = canvas.width;
-			  const h = canvas.height;
-
-			  // ---- SAFE STYLING DEFAULTS (prevents reading properties of undefined) ----
-			  const styling = Object.assign({
-				titleFont: "Impact, 'Anton', 'Bebas Neue', 'Arial Black', sans-serif",
-				titleColor: 'white',
-				titleGlow: 'rgba(0,0,0,0.7)',
-				creditsColor: 'white'
-			  }, this.styling || {});
-
-			  const fontFamily = styling.titleFont;
-			  const maxTextWidth = Math.floor(w * 0.90);
-
-			  // --- Title Rendering ---
-			  ctx.textBaseline = 'top';
-			  ctx.textAlign = 'center';
-
-			  const titleText = (concept && concept.title ? String(concept.title) : 'UNTITLED').toUpperCase();
-
-			  let fontSize = Math.min(Math.floor(w / 8), 120);
-			  ctx.font = `bold ${fontSize}px ${fontFamily}`;
-
-			  // Shrink until it fits within max width
-			  while (ctx.measureText(titleText).width > maxTextWidth && fontSize > 20) {
-				fontSize -= 2;
-				ctx.font = `bold ${fontSize}px ${fontFamily}`;
-			  }
-
-			  // Draw title with subtle shadow/glow
-			  ctx.fillStyle = styling.titleColor;
-			  ctx.shadowColor = styling.titleGlow;
-			  ctx.shadowBlur = Math.floor(fontSize / 6);
-			  ctx.fillText(titleText, Math.floor(w / 2), Math.floor(h * 0.10));
-			  ctx.shadowBlur = 0;
-
-			  // --- Credits (checkerboard cast + centered metadata) ---
-			  let creditsStartY = Math.floor(h * 0.80);
-
-			  // Cast fallback
-			  let castNames = [];
-			  if (Array.isArray(concept?.cast) && concept.cast.length) {
-				castNames = concept.cast.slice(0, 6).map(n => String(n).trim().toUpperCase());
-			  } else {
-				const firstNames = ["Alex","Jordan","Taylor","Morgan","Riley","Casey","Jamie","Sam","Cameron","Dana"];
-				const lastNames  = ["Reeves","Winters","Stone","Black","Knight","Frost","Hale","Rivera","Cole","Summers"];
+			// NEW: Fallback cast generator (replaces the inline generation in your old code)
+			generateFallbackCast() {
+				const firstNames = ["Elena","Marcus","Zara","Vincent","Luna","Dante","Iris","Phoenix","Nova","Atlas"];
+				const lastNames = ["Cross","Vale","Storm","Kane","Thorne","Rivers","Blake","Steel","Fox","Night"];
+				
+				const cast = [];
 				for (let i = 0; i < 4; i++) {
-				  const fn = firstNames[Math.floor(Math.random()*firstNames.length)];
-				  const ln = lastNames[Math.floor(Math.random()*lastNames.length)];
-				  castNames.push((fn + ' ' + ln).toUpperCase());
+					const first = firstNames[Math.floor(Math.random() * firstNames.length)];
+					const last = lastNames[Math.floor(Math.random() * lastNames.length)];
+					cast.push((first + ' ' + last).toUpperCase());
 				}
-			  }
-
-			  // Build lines
-			  const creditsLines = [];
-			  castNames.forEach((name, i) => {
-				creditsLines.push({ text: name, type: 'cast', align: (i % 2 === 0) ? 'left' : 'right' });
-			  });
-			  if (concept?.director) {
-				creditsLines.push({ text: ('DIRECTED BY ' + String(concept.director).toUpperCase()), type: 'director', align: 'center' });
-			  }
-			  creditsLines.push({ text: 'AN ABNORMAL STUDIOS FILM', type: 'studio', align: 'center' });
-			  creditsLines.push({
-				text: 'NR  •  ' + ['89 MINUTES','95 MINUTES','103 MINUTES','117 MINUTES','124 MINUTES','138 MINUTES'][Math.floor(Math.random()*6)],
-				type: 'rating',
-				align: 'center'
-			  });
-			  creditsLines.push({
-				text: '© ' + new Date().getFullYear() + ' ABNORMAL STUDIOS',
-				type: 'copyright',
-				align: 'center'
-			  });
-
-			  const creditSizes = {
-				cast: Math.max(14, Math.floor(w / 52)),
-				director: Math.max(12, Math.floor(w / 55)),
-				studio: Math.max(14, Math.floor(w / 50)),
-				rating: Math.max(11, Math.floor(w / 60)),
-				copyright: Math.max(9, Math.floor(w / 65))
-			  };
-
-			  let currentY = creditsStartY;
-			  const maxY = h - Math.floor(h * 0.04); // bottom margin
-			  const lineLimit = 10;
-
-			  for (let i = 0, drawn = 0; i < creditsLines.length && drawn < lineLimit; i++) {
-				const credit = creditsLines[i];
-				if (!credit.text) continue;
-
-				const size = creditSizes[credit.type] || Math.max(12, Math.floor(w / 55));
-				const lineHeight = Math.floor(size * 1.35);
-
-				if (currentY + size > maxY) break;
-
-				ctx.font = `bold ${size}px ${fontFamily}`;
-				ctx.fillStyle = styling.creditsColor;
-				ctx.textBaseline = 'top';
-
-				if (credit.align === 'left') {
-				  ctx.textAlign = 'left';
-				  ctx.fillText(credit.text, Math.floor(w * 0.10), currentY);
-				} else if (credit.align === 'right') {
-				  ctx.textAlign = 'right';
-				  ctx.fillText(credit.text, Math.floor(w * 0.90), currentY);
-				} else {
-				  ctx.textAlign = 'center';
-				  ctx.fillText(credit.text, Math.floor(w / 2), currentY);
-				}
-
-				currentY += lineHeight;
-				drawn++;
-			  }
-
-			  try {
-				console.log('Text rendering completed');
-			  } catch (error) {
-				console.error('Text rendering failed:', error);
-			  }
+				return cast;
 			}
-
 
 
 			renderTitleSafely(concept, ctx, w, h, styling, maxTextWidth) {
