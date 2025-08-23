@@ -668,6 +668,7 @@
                 const self = this;
                 return new Promise(function(resolve) {
                     const img = new Image();
+                    img.crossOrigin = 'anonymous';
                     img.onload = function() {
                         const isMobile = window.innerWidth <= 768;
                         const targetW = isMobile ? 512 : 1024; 
