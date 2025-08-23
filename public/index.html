@@ -278,6 +278,26 @@
 
     <script>
         class EnhancedPosterAI {
+
+    // Wrapper for compatibility: map generateConcept to generateMovieConcept
+    generateConcept() {
+        return this.generateMovieConcept();
+    }
+
+    // Build a concise visual intent string from concept.visual_spec
+    buildVisualIntent(concept) {
+        const vs = (concept && concept.visual_spec) ? concept.visual_spec : {};
+        const parts = [
+            vs.composition || '',
+            vs.lighting || '',
+            vs.environment || ''
+        ];
+        if (Array.isArray(vs.motifs) && vs.motifs.length) {
+            parts.push(vs.motifs.slice(0, 2).join(', '));
+        }
+        return parts.filter(Boolean).join(', ');
+    }
+
             constructor() {
                 console.log('EnhancedPosterAI constructor called');
                 
