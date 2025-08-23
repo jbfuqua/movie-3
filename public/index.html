@@ -643,57 +643,70 @@
                 return stylings[decade] || stylings['1980s'];
             }
 
-            smartCropToInstagramRatio(imageUrl) {
-                const self = this;
-                return new Promise(function(resolve) {
-                    const img = new Image();
-                    img.onload = function() {
-                        
-            const canvas = self.elements.canvas;
-            const ctx = self.ctx;
+            // Center-crop to an Instagram-friendly portrait canvas with "cover" fit.
+// - Defaults to 4:5 (1.25). Set this.aspectRatio = 1.5 for 2:3 if you prefer.
+// - Uses existing this.elements.canvas and this.ctx.
+// - Returns a Promise that resolves when drawing is complete.
+			smartCropToInstagramRatio(imageUrl) {
+			  const self = this;
+			  return new Promise((resolve) => {
+				try {
+				  const img = new Image();
+				  img.crossOrigin = 'anonymous'; // safe for canvas toDataURL when using data: URIs
 
-            const isMobile = window.innerWidth <= 768;
-            const targetW = isMobile ? 512 : 1024;          // final canvas width
-            const targetH = Math.floor(targetW * 1.25);     // 4:5 final canvas height
+				  img.onload = function () {
+					const canvas = self.elements.canvas;
+					const ctx = self.ctx;
 
-            // Set destination canvas size (Instagram 4:5) and clear
-            canvas.width = targetW;
-            canvas.height = targetH;
-            ctx.clearRect(0, 0, targetW, targetH);
+					// Target size: responsive width, fixed portrait aspect
+					const isMobile = window.innerWidth <= 768;
+					const targetW = isMobile ? 512 : 1024;
+					const aspect = (typeof self.aspectRatio === 'number' && self.aspectRatio > 0) ? self.aspectRatio : 1.25; // 4:5 by default
+					const targetH = Math.floor(targetW * aspect);
 
-            // --- Correct scaling & center-cropping ---
-            // Scale so the IMAGE HEIGHT exactly fills targetH (no vertical blanking)
-            const scale = targetH / img.height;             // e.g., 1280/1024 = 1.25
-            const scaledW = img.width * scale;              // e.g., 1280 for a 1024->1280 up-scale
+					// Prepare destination
+					canvas.width = targetW;
+					canvas.height = targetH;
+					ctx.clearRect(0, 0, targetW, targetH);
 
-            // Compute source rect in ORIGINAL image space to crop evenly left/right
-            const sx = Math.max(0, (scaledW - targetW) / 2 / scale);
-            const sy = 0;
-            const sWidth  = Math.min(img.width, targetW / scale);
-            const sHeight = Math.min(img.height, targetH / scale); // equals img.height when starting from square
+					// High-quality resampling
+					if (ctx.imageSmoothingEnabled !== undefined) {
+					  ctx.imageSmoothingEnabled = true;
+					  if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+					}
 
-            // Draw source rect into exact 4:5 destination
-            ctx.drawImage(
-                img,
-                sx, sy, sWidth, sHeight,
-                0, 0, targetW, targetH
-            );
+					// ---- Cover fit + centered crop (no blank space) ----
+					// Scale so the image fully covers the destination (like CSS object-fit: cover)
+					const scale = Math.max(targetW / img.width, targetH / img.height);
 
-            // Keep your smoothing settings
-            if (ctx.imageSmoothingEnabled !== undefined) {
-                ctx.imageSmoothingEnabled = true;
-                if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
-            }
+					// Compute the source rect in ORIGINAL image space
+					const sWidth  = targetW / scale;
+					const sHeight = targetH / scale;
+					const sx = Math.max(0, (img.width  - sWidth)  / 2);
+					const sy = Math.max(0, (img.height - sHeight) / 2);
 
-            resolve();
+					// Draw centered into the destination canvas
+					ctx.drawImage(
+					  img,
+					  sx, sy, sWidth, sHeight, // source rectangle
+					  0,  0, targetW, targetH  // destination rectangle
+					);
 
-                    };
-                    img.onerror = function() {
-                        resolve();
-                    };
-                    img.src = imageUrl;
-                });
-            }
+					resolve();
+				  };
+
+				  img.onerror = function () {
+					// Fail gracefully: leave canvas untouched and continue pipeline
+					resolve();
+				  };
+
+				  img.src = imageUrl; // should already be a data: URI from your handleGeneration normalization
+				} catch (_) {
+				  resolve();
+				}
+			  });
+			}
+
 
             addGradientOverlays() {
                 const canvas = this.elements.canvas;
@@ -1551,62 +1564,65 @@
             }
 
             async handleGeneration() {
-                console.log('handleGeneration called');
+			  try {
+				this.clearError?.();
+				this.setLoadingState(true);
 
-				if (this.isGenerating) {
-					console.log('Generation already in progress, aborting');
-					return;
+				// Concept
+				this.updateProgress('concept', 10);
+				const concept = await this.generateConcept();
+				if (!concept) {
+				  this.setLoadingState(false);
+				  return;
 				}
-                 
-                this.hideError();
-                this.setLoadingState(true);
-                this.updateInfo({ decade: '...', genre: '...', title: '...', tagline: '...', synopsis: '...' });
+				this.currentConcept = concept;
+				this.updateInfo(concept);
 
-                try {
-                    this.updateProgress('concept', 10);
-                    const concept = await this.generateMovieConcept();
-                    if (!concept) {
-                        this.setLoadingState(false);
-                        return;
-                    }
-                    
-                    concept.artStyle = this.elements.artStyleFilter.value;
-                    this.currentConcept = concept;
-                    this.updateInfo(concept);
+				// Image
+				this.updateProgress('image', 40);
+				const baseImageUrl = await this.generateImage(this.buildVisualIntent(concept), concept);
+				if (!baseImageUrl) {
+				  this.setLoadingState(false);
+				  return;
+				}
 
-                    this.updateProgress('image', 40);
-                    const baseImageUrl = await this.generateImage(concept.visual_elements, concept);
-                    if (!baseImageUrl) {
-                        this.setLoadingState(false);
-                        return;
-                    }
+				// Normalize to a safe data: URI so canvas operations never taint or get blocked
+				const _safeBase = (
+				  typeof baseImageUrl === 'string' && baseImageUrl.startsWith('data:')
+				) ? baseImageUrl
+				  : (/^https?:\/\//.test(baseImageUrl) ? baseImageUrl
+				  : `data:image/png;base64,${baseImageUrl}`);
 
-                    this.updateProgress('text', 70);
-                    await this.smartCropToInstagramRatio(baseImageUrl);
-                    this.addGradientOverlays();
-                    await this.renderTitleAndCredits(concept);
-                    
-                    this.updateProgress('song', 85);
-                    
-                    this.updateProgress('complete', 100);
-                    const finalImageUrl = this.elements.canvas.toDataURL('image/png');
-                    this.elements.posterImage.src = finalImageUrl;
-                    
-                    this.addToRecent(finalImageUrl, concept);
-                    
-                    this.generationCount++;
-                    this.elements.generationCounter.textContent = this.generationCount + ' poster' + (this.generationCount !== 1 ? 's' : '') + ' created';
-                    
-                } catch (error) {
-                    console.error("Error in generation process:", error);
-                    this.showError("Failed to process the poster. Please try again.");
-                } finally {
-                    this.setLoadingState(false);
-                    if (this.autoGenerate) {
-                        this.startAutoTimer();
-                    }
-                }
-            }
+				// Crop & compose
+				this.updateProgress('text', 70);
+				await this.smartCropToInstagramRatio(_safeBase);   // this contains the center-crop fix
+				this.addGradientOverlays?.();
+				await this.renderTitleAndCredits(concept);
+
+				// Optional: soundtrack (only if your app already calls it)
+				if (typeof this.generateSong === 'function') {
+				  this.updateProgress('song', 85);
+				  try { await this.generateSong(concept); } catch (_) { /* non-fatal */ }
+				}
+
+				// Finalize
+				this.updateProgress('complete', 100);
+				const finalImageUrl = this.elements.canvas.toDataURL('image/png');
+				this.elements.posterImage.src = finalImageUrl;
+
+				// Track recent
+				this.recentPosters = this.recentPosters || [];
+				this.recentPosters.unshift({ imageUrl: finalImageUrl, concept });
+				if (this.recentPosters.length > 12) this.recentPosters.pop();
+
+			  } catch (error) {
+				console.error('Error in generation process:', error);
+				this.showError?.('Error in generation process: ' + (error?.message || error));
+			  } finally {
+				this.setLoadingState(false);
+			  }
+			}
+
         }
 
         document.addEventListener('DOMContentLoaded', function() {
