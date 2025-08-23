@@ -277,33 +277,7 @@
     <canvas id="poster-canvas" class="hidden"></canvas>
 
     <script>
-        
-    // Helper: normalize incoming image to a safe blob: URL (avoids ad blockers and canvas taint)
-    function normalizeToBlobUrl(maybeBase64OrUrl) {
-      try {
-        let s = String(maybeBase64OrUrl || '');
-        if (s.startsWith('blob:') || s.startsWith('data:')) return s;
-        if (!/^https?:\/\//i.test(s) && !s.startsWith('data:')) {
-          s = 'data:image/png;base64,' + s;
-        }
-        if (!s.startsWith('data:')) return s;
-        const comma = s.indexOf(',');
-        const header = s.slice(0, comma);
-        const b64 = s.slice(comma + 1);
-        const mimeMatch = /data:(.*?);base64/i.exec(header);
-        const mime = (mimeMatch && mimeMatch[1]) || 'image/png';
-        const bin = atob(b64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const blob = new Blob([bytes], { type: mime });
-        return URL.createObjectURL(blob);
-      } catch (e) {
-        console.warn('normalizeToBlobUrl failed:', e);
-        return maybeBase64OrUrl;
-      }
-    }
-    
-class EnhancedPosterAI {
+        class EnhancedPosterAI {
             constructor() {
                 console.log('EnhancedPosterAI constructor called');
                 
@@ -670,27 +644,57 @@ class EnhancedPosterAI {
             }
 
             smartCropToInstagramRatio(imageUrl) {
-                const self = this;
-                return new Promise(function(resolve) {
-                    const img = new Image();
-                    img.onload = function() {
-                        const isMobile = window.innerWidth <= 768;
-                        const targetW = isMobile ? 512 : 1024; 
-                        const targetH = Math.floor(targetW * 1.25);
-                        const step = isMobile ? 16 : 32;
-                        let bestCrop = { y: 0, score: -Infinity };
+                
+  const self = this;
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onerror = () => { console.warn('Image load failed:', imageUrl); resolve(); };
 
-                        const tempCanvas = document.createElement('canvas');
-                        const tempCtx = tempCanvas.getContext('2d');
-                        tempCanvas.width = img.width;
-                        tempCanvas.height = img.height;
-						
-						try {
-							// Ensure canvas dimensions are valid
-							if (targetW <= 0 || targetH <= 0) {
-								console.error('Invalid canvas dimensions:', targetW, targetH);
-								resolve();
-								return;
+      img.onload = function () {
+        const canvas = self.elements.canvas;
+        const ctx = self.ctx;
+
+        const isMobile = window.innerWidth <= 768;
+        const targetW = isMobile ? 512 : 1024;
+
+        // 4:5 portrait default; set self.aspectRatio = 1.5 for 2:3 if desired
+        const aspect = (typeof self.aspectRatio === 'number' && self.aspectRatio > 0) ? self.aspectRatio : 1.25;
+        const targetH = Math.floor(targetW * aspect);
+
+        // Prepare destination; fill background to avoid any transparent band
+        canvas.width = targetW;
+        canvas.height = targetH;
+        ctx.clearRect(0, 0, targetW, targetH);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, targetW, targetH);
+
+        // High-quality resampling
+        if (ctx.imageSmoothingEnabled !== undefined) {
+          ctx.imageSmoothingEnabled = true;
+          if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+        }
+
+        // Cover fit + centered crop
+        const scale = Math.max(targetW / img.width, targetH / img.height);
+        const sWidth  = targetW / scale;
+        const sHeight = targetH / scale;
+        const sx = Math.max(0, (img.width  - sWidth)  / 2);
+        const sy = Math.max(0, (img.height - sHeight) / 2);
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetW, targetH);
+        resolve();
+      };
+
+      // Normalize to blob:/data:
+      const normalized = (typeof normalizeToBlobUrl === 'function') ? normalizeToBlobUrl(imageUrl) : imageUrl;
+      img.src = normalized;
+    } catch (_) {
+      resolve();
+    }
+  });
+
 							}
 							
 							// Apply DPI scaling if needed
@@ -763,8 +767,7 @@ class EnhancedPosterAI {
                     img.onerror = function() {
                         resolve();
                     };
-                    img.onerror = function(){ console.warn('Image load failed:', imageUrl); resolve && resolve(); };
-            img.src = normalizeToBlobUrl(imageUrl);
+                    img.src = imageUrl;
                 });
             }
 
@@ -1544,7 +1547,7 @@ console.log('Text rendering completed');
 
             loadPosterFromRecent(index) {
                 const poster = this.recentPosters[index];
-                this.elements.posterImage.src = normalizeToBlobUrl(poster.imageUrl);
+                this.elements.posterImage.src = poster.imageUrl;
                 this.currentConcept = poster.concept;
                 this.updateInfo(poster.concept);
                 this.elements.posterImage.classList.remove('hidden');
@@ -1677,8 +1680,7 @@ console.log('Text rendering completed');
                     }
 
                     this.updateProgress('text', 70);
-                    const _safeForImg = normalizeToBlobUrl(baseImageUrl);
-        await this.smartCropToInstagramRatio(_safeForImg);
+                    await this.smartCropToInstagramRatio(baseImageUrl);
                     this.addGradientOverlays();
                     await this.renderTitleAndCredits(concept);
                     
