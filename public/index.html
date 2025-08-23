@@ -596,87 +596,107 @@
                 }
             }
 
-            getEraSpecificStyling(decade, genre) {
-                const isSciFi = (genre || '').toLowerCase().includes('sci-fi');
-                const isHorror = (genre || '').toLowerCase().includes('horror');
-                
-                const stylings = {
-                    '1950s': {
-                        titleFont: 'Cinzel',
-                        taglineFont: 'Lato',
-                        creditsFont: 'Lato',
-                        titleColor: '#ffffff',
-                        titleGlow: 'rgba(255, 215, 0, 0.8)',
-                        taglineColor: 'rgba(255, 255, 255, 0.9)',
-                        creditsColor: 'rgba(255, 255, 255, 0.85)'
-                    },
-                    '1960s': {
-                        titleFont: isSciFi ? 'Orbitron' : 'Bebas Neue',
-                        taglineFont: 'Lato',
-                        creditsFont: 'Lato', 
-                        titleColor: isSciFi ? '#00ffff' : '#ffffff',
-                        titleGlow: isSciFi ? 'rgba(0, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.8)',
-                        taglineColor: 'rgba(255, 255, 255, 0.9)',
-                        creditsColor: 'rgba(255, 255, 255, 0.85)'
-                    },
-                    '1970s': {
-                        titleFont: 'Bebas Neue',
-                        taglineFont: 'Lato',
-                        creditsFont: 'Lato',
-                        titleColor: isHorror ? '#ff6b6b' : '#ffd700',
-                        titleGlow: isHorror ? 'rgba(255, 107, 107, 0.9)' : 'rgba(255, 215, 0, 0.8)',
-                        taglineColor: 'rgba(255, 255, 255, 0.9)',
-                        creditsColor: 'rgba(255, 255, 255, 0.85)'
-                    },
-                    '1980s': {
-                        titleFont: 'Orbitron',
-                        taglineFont: 'Orbitron',
-                        creditsFont: 'Lato',
-                        titleColor: isSciFi ? '#00ffff' : (isHorror ? '#ff1493' : '#ff6b35'),
-                        titleGlow: isSciFi ? 'rgba(0, 255, 255, 1.0)' : (isHorror ? 'rgba(255, 20, 147, 0.9)' : 'rgba(255, 107, 53, 0.9)'),
-                        taglineColor: isSciFi ? 'rgba(0, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                        creditsColor: 'rgba(255, 255, 255, 0.85)'
-                    },
-                    '1990s': {
-                        titleFont: 'Montserrat',
-                        taglineFont: 'Lato',
-                        creditsFont: 'Lato',
-                        titleColor: '#ffffff',
-                        titleGlow: 'rgba(128, 128, 128, 0.7)',
-                        taglineColor: 'rgba(255, 255, 255, 0.9)',
-                        creditsColor: 'rgba(255, 255, 255, 0.85)'
-                    },
-                    '2000s': {
-                        titleFont: 'Oswald',
-                        taglineFont: 'Lato',
-                        creditsFont: 'Lato',
-                        titleColor: isSciFi ? '#00ff41' : '#ffffff',
-                        titleGlow: isSciFi ? 'rgba(0, 255, 65, 0.8)' : 'rgba(255, 255, 255, 0.7)',
-                        taglineColor: 'rgba(255, 255, 255, 0.9)',
-                        creditsColor: 'rgba(255, 255, 255, 0.85)'
-                    },
-                    '2010s': {
-                        titleFont: 'Poppins',
-                        taglineFont: 'Poppins',
-                        creditsFont: 'Lato',
-                        titleColor: '#ffffff',
-                        titleGlow: 'rgba(59, 130, 246, 0.8)',
-                        taglineColor: 'rgba(255, 255, 255, 0.9)',
-                        creditsColor: 'rgba(255, 255, 255, 0.85)'
-                    },
-                    '2020s': {
-                        titleFont: 'Montserrat',
-                        taglineFont: 'Poppins',
-                        creditsFont: 'Lato',
-                        titleColor: '#ffffff',
-                        titleGlow: 'rgba(0, 0, 0, 0.9)',
-                        taglineColor: 'rgba(255, 255, 255, 0.95)',
-                        creditsColor: 'rgba(255, 255, 255, 0.9)'
-                    }
-                };
-                
-                return stylings[decade] || stylings['1980s'];
-            }
+			getEraSpecificStyling(decade, genre) {
+				const isSciFi = (genre || '').toLowerCase().includes('sci-fi');
+				const isHorror = (genre || '').toLowerCase().includes('horror');
+				
+				const eraStyles = {
+					'1950s': {
+						titleFont: 'Cinzel, serif',
+						letterSpacing: 0.05,
+						titleColor: '#ffffff',
+						titleGlow: 'rgba(255, 215, 0, 0.8)',
+						glowIntensity: 8,
+						useChrome: false,
+						useStroke: false,
+						strokeWidth: 2
+					},
+					'1960s': {
+						titleFont: isSciFi ? 'Orbitron, sans-serif' : 'Bebas Neue, sans-serif',
+						letterSpacing: isSciFi ? 0.12 : 0.08,
+						titleColor: isSciFi ? '#00ffff' : '#ffffff',
+						titleGlow: isSciFi ? 'rgba(0, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.8)',
+						glowIntensity: 12,
+						useChrome: false,
+						useStroke: isSciFi,
+						strokeWidth: 2
+					},
+					'1970s': {
+						titleFont: 'Bebas Neue, sans-serif',
+						letterSpacing: 0.06,
+						titleColor: isHorror ? '#ff6b6b' : '#ffd700',
+						titleGlow: isHorror ? 'rgba(255, 107, 107, 0.9)' : 'rgba(255, 215, 0, 0.8)',
+						glowIntensity: 10,
+						useChrome: false,
+						useStroke: false,
+						strokeWidth: 2,
+						useDropShadow: true
+					},
+					'1980s': {
+						titleFont: 'Impact, "Bebas Neue", "Arial Black", sans-serif',
+						letterSpacing: isSciFi ? 0.15 : 0.10,
+						titleColor: isSciFi ? '#00ffff' : (isHorror ? '#ff1493' : '#ff6b35'),
+						titleGlow: isSciFi ? 'rgba(0, 255, 255, 1.0)' : (isHorror ? 'rgba(255, 20, 147, 0.9)' : 'rgba(255, 107, 53, 0.9)'),
+						glowIntensity: 20,
+						useChrome: isSciFi,
+						useStroke: true,
+						strokeWidth: 3
+					},
+					'1990s': {
+						titleFont: 'Montserrat, sans-serif',
+						letterSpacing: 0.04,
+						titleColor: '#ffffff',
+						titleGlow: 'rgba(128, 128, 128, 0.7)',
+						glowIntensity: 6,
+						useChrome: false,
+						useStroke: false,
+						strokeWidth: 1
+					},
+					'2000s': {
+						titleFont: 'Oswald, sans-serif',
+						letterSpacing: 0.06,
+						titleColor: isSciFi ? '#00ff41' : '#ffffff',
+						titleGlow: isSciFi ? 'rgba(0, 255, 65, 0.8)' : 'rgba(255, 255, 255, 0.7)',
+						glowIntensity: 8,
+						useChrome: false,
+						useStroke: false,
+						strokeWidth: 1
+					},
+					'2010s': {
+						titleFont: 'Poppins, sans-serif',
+						letterSpacing: 0.03,
+						titleColor: '#ffffff',
+						titleGlow: 'rgba(59, 130, 246, 0.8)',
+						glowIntensity: 12,
+						useChrome: false,
+						useStroke: false,
+						strokeWidth: 1
+					},
+					'2020s': {
+						titleFont: 'Montserrat, sans-serif',
+						letterSpacing: 0.02,
+						titleColor: '#ffffff',
+						titleGlow: 'rgba(0, 0, 0, 0.9)',
+						glowIntensity: 4,
+						useChrome: false,
+						useStroke: false,
+						strokeWidth: 1
+					}
+				};
+				
+				const style = eraStyles[decade] || eraStyles['1980s'];
+				
+				return {
+					...style,
+					titleWeight: '900',
+					titleMargin: 0.12,
+					maxTitleWidth: 0.85,
+					taglineFont: 'Lato, sans-serif',
+					creditsFont: 'Lato, sans-serif',
+					taglineColor: 'rgba(255, 255, 255, 0.9)',
+					creditsColor: 'rgba(255, 255, 255, 0.85)'
+				};
+			}
 
 			smartCropToInstagramRatio(imageUrl) {
 			  const self = this;
@@ -873,24 +893,147 @@
 			// NEW: Enhanced title rendering with era effects
 			renderEnhancedTitle(ctx, concept, w, h, styling) {
 				const titleText = (concept?.title || 'UNTITLED').toUpperCase();
-				const maxTextWidth = Math.floor(w * 0.88);
+				
+				const horizontalMargin = Math.floor(w * styling.titleMargin);
+				const maxTitleWidth = Math.floor(w * styling.maxTitleWidth);
 				
 				ctx.textBaseline = 'top';
 				ctx.textAlign = 'center';
-
-				// Dynamic font sizing
-				let fontSize = Math.min(Math.floor(w / 8), 120);
-				ctx.font = `bold ${fontSize}px ${styling.titleFont}`;
-
-				// Shrink to fit
-				while (ctx.measureText(titleText).width > maxTextWidth && fontSize > 20) {
-					fontSize -= 2;
-					ctx.font = `bold ${fontSize}px ${styling.titleFont}`;
+				
+				let fontSize = Math.min(Math.floor(w / 6), 140);
+				ctx.font = `${styling.titleWeight} ${fontSize}px ${styling.titleFont}`;
+				
+				let totalWidth = this.measureTextWithSpacing(ctx, titleText, styling.letterSpacing);
+				
+				while (totalWidth > maxTitleWidth && fontSize > 24) {
+					fontSize -= 3;
+					ctx.font = `${styling.titleWeight} ${fontSize}px ${styling.titleFont}`;
+					totalWidth = this.measureTextWithSpacing(ctx, titleText, styling.letterSpacing);
 				}
-
-				// Apply era-specific effects
-				this.applyEraTextEffects(ctx, titleText, Math.floor(w / 2), Math.floor(h * 0.10), concept.decade, fontSize, styling);
+				
+				const titleLines = this.smartTitleWrap(titleText, maxTitleWidth, ctx, styling.letterSpacing);
+				
+				const lineHeight = fontSize * 1.1;
+				const startY = Math.max(h * 0.08, horizontalMargin);
+				
+				titleLines.forEach((line, index) => {
+					const yPos = startY + (index * lineHeight);
+					this.renderTitleWithEffects(ctx, line, w / 2, yPos, fontSize, styling);
+				});
 			}
+			
+			measureTextWithSpacing(ctx, text, spacing) {
+				if (!spacing || spacing === 0) return ctx.measureText(text).width;
+				
+				let width = 0;
+				const spaceWidth = ctx.measureText('M').width * spacing;
+				for (let i = 0; i < text.length; i++) {
+					width += ctx.measureText(text[i]).width;
+					if (i < text.length - 1) width += spaceWidth;
+				}
+				return width;
+			}
+
+			smartTitleWrap(title, maxWidth, ctx, spacing) {
+				const words = title.split(' ');
+				if (words.length === 1) return [title];
+				
+				const lines = [];
+				let currentLine = '';
+				
+				for (let word of words) {
+					const testLine = currentLine ? `${currentLine} ${word}` : word;
+					const testWidth = this.measureTextWithSpacing(ctx, testLine, spacing);
+					
+					if (testWidth <= maxWidth) {
+						currentLine = testLine;
+					} else {
+						if (currentLine) lines.push(currentLine);
+						currentLine = word;
+					}
+				}
+				
+				if (currentLine) lines.push(currentLine);
+				return lines.slice(0, 2);
+			}
+
+			renderTitleWithEffects(ctx, text, x, y, fontSize, styling) {
+				ctx.save();
+				
+				// Shadow
+				ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+				const shadowOffset = styling.useDropShadow ? Math.floor(fontSize / 15) : 3;
+				this.renderTextWithSpacing(ctx, text, x + shadowOffset, y + shadowOffset, styling.letterSpacing);
+				
+				// Chrome effect (1980s sci-fi)
+				if (styling.useChrome) {
+					ctx.fillStyle = '#1a1a1a';
+					this.renderTextWithSpacing(ctx, text, x, y, styling.letterSpacing);
+					
+					ctx.strokeStyle = styling.titleColor;
+					ctx.lineWidth = styling.strokeWidth;
+					ctx.lineJoin = 'round';
+					this.strokeTextWithSpacing(ctx, text, x, y, styling.letterSpacing);
+				}
+				
+				// Stroke (various eras)
+				if (styling.useStroke && !styling.useChrome) {
+					ctx.strokeStyle = styling.titleGlow;
+					ctx.lineWidth = styling.strokeWidth;
+					this.strokeTextWithSpacing(ctx, text, x, y, styling.letterSpacing);
+				}
+				
+				// Main glow
+				ctx.shadowColor = styling.titleGlow;
+				ctx.shadowBlur = styling.glowIntensity;
+				ctx.fillStyle = styling.titleColor;
+				this.renderTextWithSpacing(ctx, text, x, y, styling.letterSpacing);
+				
+				// Bright highlight (strong glow eras)
+				if (styling.glowIntensity > 15) {
+					ctx.shadowBlur = styling.glowIntensity * 1.5;
+					ctx.fillStyle = '#ffffff';
+					this.renderTextWithSpacing(ctx, text, x, y, styling.letterSpacing);
+				}
+				
+				ctx.restore();
+			}
+
+			renderTextWithSpacing(ctx, text, x, y, spacing) {
+				if (!spacing || spacing === 0) {
+					ctx.fillText(text, x, y);
+					return;
+				}
+				
+				const totalWidth = this.measureTextWithSpacing(ctx, text, spacing);
+				let currentX = x - (totalWidth / 2);
+				const spaceWidth = ctx.measureText('M').width * spacing;
+				
+				for (let i = 0; i < text.length; i++) {
+					const char = text[i];
+					ctx.fillText(char, currentX, y);
+					currentX += ctx.measureText(char).width;
+					if (i < text.length - 1) currentX += spaceWidth;
+				}
+			}
+
+			strokeTextWithSpacing(ctx, text, x, y, spacing) {
+				if (!spacing || spacing === 0) {
+					ctx.strokeText(text, x, y);
+					return;
+				}
+				
+				const totalWidth = this.measureTextWithSpacing(ctx, text, spacing);
+				let currentX = x - (totalWidth / 2);
+				const spaceWidth = ctx.measureText('M').width * spacing;
+				
+				for (let i = 0; i < text.length; i++) {
+					const char = text[i];
+					ctx.strokeText(char, currentX, y);
+					currentX += ctx.measureText(char).width;
+					if (i < text.length - 1) currentX += spaceWidth;
+				}
+			}			
 
 			// NEW: Enhanced credit rendering system
 			renderCreditsWithHierarchy(ctx, concept, canvas, styling) {
