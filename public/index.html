@@ -922,14 +922,23 @@
 			  const w = canvas.width;
 			  const h = canvas.height;
 
-			  const fontFamily = this.styling.titleFont;
-			  const maxTextWidth = w * 0.9;
+			  // ---- SAFE STYLING DEFAULTS (prevents reading properties of undefined) ----
+			  const styling = Object.assign({
+				titleFont: "Impact, 'Anton', 'Bebas Neue', 'Arial Black', sans-serif",
+				titleColor: 'white',
+				titleGlow: 'rgba(0,0,0,0.7)',
+				creditsColor: 'white'
+			  }, this.styling || {});
+
+			  const fontFamily = styling.titleFont;
+			  const maxTextWidth = Math.floor(w * 0.90);
 
 			  // --- Title Rendering ---
 			  ctx.textBaseline = 'top';
 			  ctx.textAlign = 'center';
 
-			  const titleText = concept.title ? concept.title.toUpperCase() : 'UNTITLED';
+			  const titleText = (concept && concept.title ? String(concept.title) : 'UNTITLED').toUpperCase();
+
 			  let fontSize = Math.min(Math.floor(w / 8), 120);
 			  ctx.font = `bold ${fontSize}px ${fontFamily}`;
 
@@ -940,10 +949,10 @@
 			  }
 
 			  // Draw title with subtle shadow/glow
-			  ctx.fillStyle = this.styling.titleColor || 'white';
-			  ctx.shadowColor = this.styling.titleGlow || 'rgba(0,0,0,0.7)';
-			  ctx.shadowBlur = fontSize / 6;
-			  ctx.fillText(titleText, w / 2, h * 0.10);
+			  ctx.fillStyle = styling.titleColor;
+			  ctx.shadowColor = styling.titleGlow;
+			  ctx.shadowBlur = Math.floor(fontSize / 6);
+			  ctx.fillText(titleText, Math.floor(w / 2), Math.floor(h * 0.10));
 			  ctx.shadowBlur = 0;
 
 			  // --- Credits (checkerboard cast + centered metadata) ---
@@ -951,8 +960,8 @@
 
 			  // Cast fallback
 			  let castNames = [];
-			  if (Array.isArray(concept.cast) && concept.cast.length) {
-				castNames = concept.cast.slice(0, 6).map(n => String(n).trim());
+			  if (Array.isArray(concept?.cast) && concept.cast.length) {
+				castNames = concept.cast.slice(0, 6).map(n => String(n).trim().toUpperCase());
 			  } else {
 				const firstNames = ["Alex","Jordan","Taylor","Morgan","Riley","Casey","Jamie","Sam","Cameron","Dana"];
 				const lastNames  = ["Reeves","Winters","Stone","Black","Knight","Frost","Hale","Rivera","Cole","Summers"];
@@ -968,7 +977,7 @@
 			  castNames.forEach((name, i) => {
 				creditsLines.push({ text: name, type: 'cast', align: (i % 2 === 0) ? 'left' : 'right' });
 			  });
-			  if (concept.director) {
+			  if (concept?.director) {
 				creditsLines.push({ text: ('DIRECTED BY ' + String(concept.director).toUpperCase()), type: 'director', align: 'center' });
 			  }
 			  creditsLines.push({ text: 'AN ABNORMAL STUDIOS FILM', type: 'studio', align: 'center' });
@@ -1005,7 +1014,7 @@
 				if (currentY + size > maxY) break;
 
 				ctx.font = `bold ${size}px ${fontFamily}`;
-				ctx.fillStyle = 'white';
+				ctx.fillStyle = styling.creditsColor;
 				ctx.textBaseline = 'top';
 
 				if (credit.align === 'left') {
@@ -1023,8 +1032,13 @@
 				drawn++;
 			  }
 
-			  console.log('Text rendering completed');
+			  try {
+				console.log('Text rendering completed');
+			  } catch (error) {
+				console.error('Text rendering failed:', error);
+			  }
 			}
+
 
 
 			renderTitleSafely(concept, ctx, w, h, styling, maxTextWidth) {
