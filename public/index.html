@@ -277,7 +277,33 @@
     <canvas id="poster-canvas" class="hidden"></canvas>
 
     <script>
-        class EnhancedPosterAI {
+        
+    // Helper: normalize incoming image to a safe blob: URL (avoids ad blockers and canvas taint)
+    function normalizeToBlobUrl(maybeBase64OrUrl) {
+      try {
+        let s = String(maybeBase64OrUrl || '');
+        if (s.startsWith('blob:') || s.startsWith('data:')) return s;
+        if (!/^https?:\/\//i.test(s) && !s.startsWith('data:')) {
+          s = 'data:image/png;base64,' + s;
+        }
+        if (!s.startsWith('data:')) return s;
+        const comma = s.indexOf(',');
+        const header = s.slice(0, comma);
+        const b64 = s.slice(comma + 1);
+        const mimeMatch = /data:(.*?);base64/i.exec(header);
+        const mime = (mimeMatch && mimeMatch[1]) || 'image/png';
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: mime });
+        return URL.createObjectURL(blob);
+      } catch (e) {
+        console.warn('normalizeToBlobUrl failed:', e);
+        return maybeBase64OrUrl;
+      }
+    }
+    
+class EnhancedPosterAI {
             constructor() {
                 console.log('EnhancedPosterAI constructor called');
                 
@@ -737,7 +763,8 @@
                     img.onerror = function() {
                         resolve();
                     };
-                    img.src = imageUrl;
+                    img.onerror = function(){ console.warn('Image load failed:', imageUrl); resolve && resolve(); };
+            img.src = normalizeToBlobUrl(imageUrl);
                 });
             }
 
@@ -1517,7 +1544,7 @@ console.log('Text rendering completed');
 
             loadPosterFromRecent(index) {
                 const poster = this.recentPosters[index];
-                this.elements.posterImage.src = poster.imageUrl;
+                this.elements.posterImage.src = normalizeToBlobUrl(poster.imageUrl);
                 this.currentConcept = poster.concept;
                 this.updateInfo(poster.concept);
                 this.elements.posterImage.classList.remove('hidden');
@@ -1650,7 +1677,8 @@ console.log('Text rendering completed');
                     }
 
                     this.updateProgress('text', 70);
-                    await this.smartCropToInstagramRatio(baseImageUrl);
+                    const _safeForImg = normalizeToBlobUrl(baseImageUrl);
+        await this.smartCropToInstagramRatio(_safeForImg);
                     this.addGradientOverlays();
                     await this.renderTitleAndCredits(concept);
                     
