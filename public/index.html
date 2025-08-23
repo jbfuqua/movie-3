@@ -430,23 +430,6 @@
                 console.log('Event listeners set up');
             }
 			
-
-            buildVisualIntent(concept) {
-                try {
-                    const vs = (concept && concept.visual_spec) ? concept.visual_spec : {};
-                    const parts = [
-                        vs.composition || '',
-                        vs.lighting || '',
-                        vs.environment || ''
-                    ];
-                    if (Array.isArray(vs.motifs) && vs.motifs.length) {
-                        parts.push(vs.motifs.slice(0, 2).join(', '));
-                    }
-                    return parts.filter(Boolean).join(', ');
-                } catch (e) {
-                    return '';
-                }
-            }
 			async handleGenerationSafely() {
 				// Prevent multiple simultaneous generations
 				if (this.isGenerating) {
@@ -527,10 +510,6 @@
                     const result = JSON.parse(responseText);
                     
                     if (result.success && result.concept) {
-                        // Build distilled visual intent from the concept's visual_spec (non-UI change)
-                        const _vs = (result.concept && result.concept.visual_spec) ? result.concept.visual_spec : {};
-                        var _intent = [_vs.composition || '', _vs.lighting || '', _vs.environment || '', Array.isArray(_vs.motifs) ? _vs.motifs.slice(0,2).join(', ') : ''].filter(Boolean).join(', ');
-
                         console.log("Concept generated:", result.concept);
                         this.updateProgress('concept', 30);
                         return result.concept;
@@ -668,93 +647,46 @@
                 const self = this;
                 return new Promise(function(resolve) {
                     const img = new Image();
-                    img.crossOrigin = 'anonymous';
                     img.onload = function() {
-                        const isMobile = window.innerWidth <= 768;
-                        const targetW = isMobile ? 512 : 1024; 
-                        const targetH = Math.floor(targetW * 1.25);
-                        const step = isMobile ? 16 : 32;
-                        let bestCrop = { y: 0, score: -Infinity };
-
-                        const tempCanvas = document.createElement('canvas');
-                        const tempCtx = tempCanvas.getContext('2d');
-                        tempCanvas.width = img.width;
-                        tempCanvas.height = img.height;
-						
-						try {
-							// Ensure canvas dimensions are valid
-							if (targetW <= 0 || targetH <= 0) {
-								console.error('Invalid canvas dimensions:', targetW, targetH);
-								resolve();
-								return;
-							}
-							
-							// Apply DPI scaling if needed
-							const dpr = window.devicePixelRatio || 1;
-							if (dpr > 1 && this.originalCanvasSize) {
-								self.elements.canvas.width = targetW * dpr;
-								self.elements.canvas.height = targetH * dpr;
-								self.ctx.scale(dpr, dpr);
-							} else {
-								self.elements.canvas.width = targetW;
-								self.elements.canvas.height = targetH;
-							}
-						
-                        tempCtx.drawImage(img, 0, 0);
-
-						} catch (error) {
-							console.error('Error setting up canvas:', error);
-							resolve();
-							return;
-						}
-
-                        for (let y = 0; y <= img.height - targetH; y += step) {
-                            try {
-                                const sampleY = y + Math.floor(targetH * 0.25);
-                                const sampleH = Math.floor(targetH * 0.5);
-                                const imageData = tempCtx.getImageData(0, sampleY, targetW, sampleH);
-                                const data = imageData.data;
-                                
-                                let sum = 0;
-                                let sum2 = 0;
-                                let count = 0;
-                                const sampleRate = isMobile ? 32 : 16;
-                                
-                                for (let i = 0; i < data.length; i += sampleRate) {
-                                    const r = data[i];
-                                    const g = data[i + 1];
-                                    const b = data[i + 2];
-                                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-                                    sum += brightness;
-                                    sum2 += brightness * brightness;
-                                    count++;
-                                }
-                                
-                                const mean = sum / count;
-                                const variance = sum2 / count - mean * mean;
-                                
-                                if (variance > bestCrop.score) {
-                                    bestCrop = { y: y, score: variance };
-                                }
-                            } catch (error) {
-                                continue;
-                            }
-                        }
-
-                        self.elements.canvas.width = targetW;
-                        self.elements.canvas.height = targetH;
-                        self.ctx.clearRect(0, 0, targetW, targetH);
-                        self.ctx.drawImage(img, 0, bestCrop.y, targetW, targetH, 0, 0, targetW, targetH);
                         
-                        self.ctx.imageSmoothingEnabled = true;
-                        if (self.ctx.imageSmoothingQuality) {
-                            self.ctx.imageSmoothingQuality = 'high';
-                        }
-                        
-                        tempCanvas.width = 0;
-                        tempCanvas.height = 0;
-                        
-                        resolve();
+            const canvas = self.elements.canvas;
+            const ctx = self.ctx;
+
+            const isMobile = window.innerWidth <= 768;
+            const targetW = isMobile ? 512 : 1024;          // final canvas width
+            const targetH = Math.floor(targetW * 1.25);     // 4:5 final canvas height
+
+            // Set destination canvas size (Instagram 4:5) and clear
+            canvas.width = targetW;
+            canvas.height = targetH;
+            ctx.clearRect(0, 0, targetW, targetH);
+
+            // --- Correct scaling & center-cropping ---
+            // Scale so the IMAGE HEIGHT exactly fills targetH (no vertical blanking)
+            const scale = targetH / img.height;             // e.g., 1280/1024 = 1.25
+            const scaledW = img.width * scale;              // e.g., 1280 for a 1024->1280 up-scale
+
+            // Compute source rect in ORIGINAL image space to crop evenly left/right
+            const sx = Math.max(0, (scaledW - targetW) / 2 / scale);
+            const sy = 0;
+            const sWidth  = Math.min(img.width, targetW / scale);
+            const sHeight = Math.min(img.height, targetH / scale); // equals img.height when starting from square
+
+            // Draw source rect into exact 4:5 destination
+            ctx.drawImage(
+                img,
+                sx, sy, sWidth, sHeight,
+                0, 0, targetW, targetH
+            );
+
+            // Keep your smoothing settings
+            if (ctx.imageSmoothingEnabled !== undefined) {
+                ctx.imageSmoothingEnabled = true;
+                if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+            }
+
+            resolve();
+
                     };
                     img.onerror = function() {
                         resolve();
@@ -1643,15 +1575,14 @@
                     this.updateInfo(concept);
 
                     this.updateProgress('image', 40);
-                    const baseImageUrl = await this.generateImage(this.buildVisualIntent(concept), concept);
+                    const baseImageUrl = await this.generateImage(concept.visual_elements, concept);
                     if (!baseImageUrl) {
                         this.setLoadingState(false);
                         return;
                     }
 
                     this.updateProgress('text', 70);
-                    const _safeBase = (typeof baseImageUrl === 'string' && baseImageUrl.startsWith('data:')) ? baseImageUrl : (/^https?:\/\//.test(baseImageUrl) ? baseImageUrl : `data:image/png;base64,${baseImageUrl}`);
-                    await this.smartCropToInstagramRatio(_safeBase);
+                    await this.smartCropToInstagramRatio(baseImageUrl);
                     this.addGradientOverlays();
                     await this.renderTitleAndCredits(concept);
                     
