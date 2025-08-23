@@ -430,6 +430,23 @@
                 console.log('Event listeners set up');
             }
 			
+
+            buildVisualIntent(concept) {
+                try {
+                    const vs = (concept && concept.visual_spec) ? concept.visual_spec : {};
+                    const parts = [
+                        vs.composition || '',
+                        vs.lighting || '',
+                        vs.environment || ''
+                    ];
+                    if (Array.isArray(vs.motifs) && vs.motifs.length) {
+                        parts.push(vs.motifs.slice(0, 2).join(', '));
+                    }
+                    return parts.filter(Boolean).join(', ');
+                } catch (e) {
+                    return '';
+                }
+            }
 			async handleGenerationSafely() {
 				// Prevent multiple simultaneous generations
 				if (this.isGenerating) {
@@ -1625,7 +1642,7 @@
                     this.updateInfo(concept);
 
                     this.updateProgress('image', 40);
-                    const baseImageUrl = await this.generateImage(_intent, concept.visual_elements, concept);
+                    const baseImageUrl = await this.generateImage(this.buildVisualIntent(concept), concept);
                     if (!baseImageUrl) {
                         this.setLoadingState(false);
                         return;
